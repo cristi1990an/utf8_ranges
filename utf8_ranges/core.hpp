@@ -61,7 +61,7 @@ namespace views
 template<typename CharT>
 inline constexpr bool is_single_valid_utf8_char(std::basic_string_view<CharT> value) noexcept
 {
-	if (value.empty())
+	if (value.empty()) [[unlikely]]
 	{
 		return false;
 	}
@@ -79,7 +79,7 @@ inline constexpr bool is_single_valid_utf8_char(std::basic_string_view<CharT> va
 	const std::size_t size = value.size();
 	const unsigned char b1 = byte(0);
 
-	if (size == 1)
+	if (size == 1) [[likely]]
 	{
 		return b1 <= 0x7Fu;
 	}
@@ -154,11 +154,6 @@ namespace details
 		&& std::is_convertible_v<char8_t, CharT>)
 	inline constexpr std::size_t encode_unicode_scalar_utf8_unchecked(std::uint32_t scalar, CharT* out) noexcept
 	{
-		if (out == nullptr)
-		{
-			return 0;
-		}
-
 		if (scalar <= 0x7Fu) [[likely]]
 		{
 			out[0] = static_cast<CharT>(scalar);
@@ -193,7 +188,7 @@ namespace details
 		&& std::is_convertible_v<char8_t, CharT>)
 	inline constexpr std::size_t encode_unicode_scalar_utf8(std::uint32_t scalar, CharT* out) noexcept
 	{
-		if (!is_valid_unicode_scalar(scalar) || out == nullptr)
+		if (!is_valid_unicode_scalar(scalar)) [[unlikely]]
 		{
 			return 0;
 		}
@@ -230,7 +225,7 @@ namespace details
 		{
 			const std::uint8_t lead = static_cast<std::uint8_t>(value[index]);
 			std::size_t expected_size = 0;
-			if (lead <= 0x7Fu)
+			if (lead <= 0x7Fu) [[likely]]
 			{
 				expected_size = 1;
 			}
@@ -254,7 +249,7 @@ namespace details
 				});
 			}
 
-			if (expected_size > value.size() - index)
+			if (expected_size > value.size() - index) [[unlikely]]
 			{
 				return std::unexpected(utf8_error{
 					.code = utf8_error_code::truncated_sequence,
@@ -262,7 +257,7 @@ namespace details
 				});
 			}
 
-			if (!is_single_valid_utf8_char(value.substr(index, expected_size)))
+			if (!is_single_valid_utf8_char(value.substr(index, expected_size))) [[unlikely]]
 			{
 				return std::unexpected(utf8_error{
 					.code = utf8_error_code::invalid_sequence,
@@ -284,7 +279,7 @@ namespace details
 			return static_cast<std::uint8_t>(ch[index]);
 		};
 
-		if (ch.size() == 1)
+		if (ch.size() == 1) [[likely]]
 		{
 			return byte(0);
 		}

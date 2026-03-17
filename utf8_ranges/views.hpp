@@ -264,7 +264,7 @@ namespace views
 		private:
 			constexpr void load_current() noexcept
 			{
-				if (current_ == end_)
+				if (current_ == end_) [[unlikely]]
 				{
 					return;
 				}
@@ -273,7 +273,7 @@ namespace views
 				const std::size_t remaining = static_cast<std::size_t>(end_ - current_);
 				const std::uint8_t lead = static_cast<std::uint8_t>(*current_);
 				std::size_t expected_size = 0;
-				if (lead <= 0x7Fu)
+				if (lead <= 0x7Fu) [[likely]]
 				{
 					expected_size = 1;
 				}
@@ -296,7 +296,7 @@ namespace views
 				}
 
 				const std::basic_string_view<CharT> candidate{ current_, expected_size };
-				if (!is_single_valid_utf8_char(candidate))
+				if (!is_single_valid_utf8_char(candidate)) [[unlikely]]
 				{
 					return;
 				}

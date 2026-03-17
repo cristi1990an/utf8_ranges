@@ -68,12 +68,12 @@ public:
 
 	constexpr bool is_char_boundary(size_type index) const noexcept
 	{
-		if (index > size())
+		if (index > size()) [[unlikely]]
 		{
 			return false;
 		}
 
-		if (index == 0 || index == size())
+		if (index == 0 || index == size()) [[unlikely]]
 		{
 			return true;
 		}
@@ -88,7 +88,7 @@ public:
 
 	constexpr std::pair<View, View> split(size_type delim) const
 	{
-		if (!is_char_boundary(delim))
+		if (!is_char_boundary(delim)) [[unlikely]]
 		{
 			throw std::out_of_range("split index must be at a UTF-8 character boundary");
 		}
@@ -105,7 +105,7 @@ public:
 	{
 		for (const auto& [idx, ch] : char_indices())
 		{
-			if (idx == index)
+			if (idx == index) [[unlikely]]
 			{
 				return ch;
 			}
@@ -116,7 +116,7 @@ public:
 
 	constexpr std::optional<View> substr(size_type pos, size_type count = npos) const noexcept
 	{
-		if (!is_char_boundary(pos))
+		if (!is_char_boundary(pos)) [[unlikely]]
 		{
 			return std::nullopt;
 		}
@@ -125,7 +125,7 @@ public:
 			? size()
 			: (std::min)(size(), pos + count);
 
-		if (!is_char_boundary(end))
+		if (!is_char_boundary(end)) [[unlikely]]
 		{
 			return std::nullopt;
 		}
@@ -207,7 +207,7 @@ public:
 
 	static constexpr std::expected<utf8_string_view, utf8_error> from_bytes(std::u8string_view bytes) noexcept
 	{
-		if (auto validation = details::validate_utf8(bytes); !validation)
+		if (auto validation = details::validate_utf8(bytes); !validation) [[unlikely]]
 		{
 			return std::unexpected(validation.error());
 		}

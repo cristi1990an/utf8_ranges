@@ -18,7 +18,7 @@ public:
 	static constexpr std::optional<utf8_char> from_scalar(std::uint32_t scalar) noexcept
 	{
 		utf8_char value;
-		if (!value.assign_scalar(scalar))
+		if (!value.assign_scalar(scalar)) [[unlikely]]
 		{
 			return std::nullopt;
 		}
@@ -229,7 +229,7 @@ public:
 	constexpr utf8_char& operator--() noexcept
 	{
 		const std::uint8_t b0 = static_cast<std::uint8_t>(bytes_[0]);
-		if (b0 == 0)
+		if (b0 == 0) [[unlikely]]
 		{
 			set_four(0xF4u, 0x8Fu, 0xBFu, 0xBFu);
 			return *this;
@@ -662,7 +662,7 @@ private:
 
 	constexpr bool assign_scalar(std::uint32_t scalar) noexcept
 	{
-		if (!details::is_valid_unicode_scalar(scalar))
+		if (!details::is_valid_unicode_scalar(scalar)) [[unlikely]]
 		{
 			return false;
 		}
@@ -738,14 +738,14 @@ namespace std
 			auto end = ctx.end();
 			while (it != end && *it != '}')
 			{
-				if (spec_len_ >= max_spec_size)
+				if (spec_len_ >= max_spec_size) [[unlikely]]
 				{
 					throw std::format_error("utf8_char format specifier is too long");
 				}
 				spec_[spec_len_++] = *it++;
 			}
 
-			if (it == end)
+			if (it == end) [[unlikely]]
 			{
 				throw std::format_error("missing closing brace in utf8_char format specifier");
 			}
@@ -755,7 +755,7 @@ namespace std
 				presentation_ = spec_[spec_len_ - 1];
 			}
 
-			if (presentation_ != '\0' && presentation_ != 'c' && !is_numeric_presentation(presentation_))
+			if (presentation_ != '\0' && presentation_ != 'c' && !is_numeric_presentation(presentation_)) [[unlikely]]
 			{
 				throw std::format_error("unsupported utf8_char presentation type");
 			}
@@ -783,7 +783,7 @@ namespace std
 		template<typename FormatContext>
 		auto format(const utf8_ranges::utf8_char& value, FormatContext& ctx) const
 		{
-			if (use_numeric_formatter_)
+			if (use_numeric_formatter_) [[unlikely]]
 			{
 				return numeric_formatter_.format(value.as_scalar(), ctx);
 			}
