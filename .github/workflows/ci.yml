@@ -27,7 +27,7 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Build
-        run: msbuild utf8_ranges.vcxproj /p:Configuration=${{ matrix.configuration }} /p:Platform=x64 /p:PlatformToolset=v143
+        run: msbuild utf8_ranges.vcxproj /p:Configuration=${{ matrix.configuration }} /p:Platform=x64 /p:PlatformToolset=v143 /p:TreatWarningAsError=true
 
       - name: Run tests
         run: .\x64\${{ matrix.configuration }}\utf8_ranges.exe
@@ -50,7 +50,7 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Build
-        run: msbuild utf8_ranges.vcxproj /p:Configuration=${{ matrix.configuration }} /p:Platform=x64 /p:PlatformToolset=ClangCL
+        run: msbuild utf8_ranges.vcxproj /p:Configuration=${{ matrix.configuration }} /p:Platform=x64 /p:PlatformToolset=ClangCL /p:TreatWarningAsError=true
 
       - name: Run tests
         run: .\x64\${{ matrix.configuration }}\utf8_ranges.exe
@@ -205,7 +205,7 @@ jobs:
         run: ${{ matrix.cxx }} --version
 
       - name: Build
-        run: ${{ matrix.cxx }} -std=c++23 ${{ matrix.opt_flags }} -Wall -Wextra -pedantic ${{ matrix.cxxflags }} ${{ matrix.sanitizer_flags }} source.cpp -o ${{ matrix.output }}
+        run: ${{ matrix.cxx }} -std=c++23 ${{ matrix.opt_flags }} -Wall -Wextra -Werror -pedantic ${{ matrix.cxxflags }} ${{ matrix.sanitizer_flags }} source.cpp -o ${{ matrix.output }}
 
       - name: Run tests
         run: ./${{ matrix.output }}
