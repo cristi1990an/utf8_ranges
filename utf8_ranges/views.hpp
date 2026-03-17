@@ -2,7 +2,8 @@
 
 #include "utf8_char.hpp"
 
-struct utf8_char;
+namespace utf8_ranges
+{
 
 namespace views
 {
@@ -338,4 +339,6 @@ namespace views
 	};
 
 	inline constexpr lossy_utf8_fn lossy_utf8{};
+}
+
 }

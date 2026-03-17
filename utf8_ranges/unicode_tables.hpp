@@ -1,5 +1,7 @@
 #pragma once
 
+namespace utf8_ranges
+{
 namespace details::unicode
 {
 struct unicode_range
@@ -2347,4 +2349,6 @@ constexpr bool is_digit(std::uint32_t scalar) noexcept
 {
     return in_ranges(scalar, digit_ranges);
 }
+}
+
 }

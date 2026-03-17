@@ -7,15 +7,21 @@ The library models UTF-8 text in a few distinct layers:
 - `utf8_char`: one Unicode scalar value stored as its encoded UTF-8 byte sequence, guaranteed to represent a valid UTF-8 character
 - `utf8_string_view`: borrowed UTF-8 byte view, similar to `std::string_view` but guaranteed to represent a valid UTF-8 string slice
 - `utf8_string`: an owning UTF-8 string, similar to `std::string` but guaranteed to store valid UTF-8
-- `views::utf8_view`: lazy iteration over valid UTF-8
-- `views::reversed_utf8_view`: lazy reverse-order iteration over valid UTF-8
-- `views::lossy_utf8_view`: lossy iteration over arbitrary byte sequences
+- `utf8_ranges::views::utf8_view`: lazy iteration over valid UTF-8
+- `utf8_ranges::views::reversed_utf8_view`: lazy reverse-order iteration over valid UTF-8
+- `utf8_ranges::views::lossy_utf8_view`: lossy iteration over arbitrary byte sequences
 
 The public entry point is:
 
 ```cpp
 #include "utf8_ranges.hpp"
 ```
+
+All public library types and functions live in namespace `utf8_ranges`.
+
+Literal operators live in the nested namespace `utf8_ranges::literals`.
+
+The nested namespace `utf8_ranges::details` contains implementation details only. It is not part of the supported public API and should not be used directly by library users.
 
 ## Contents
 
@@ -74,9 +80,9 @@ This constant aliases the generated Unicode version used by the Unicode property
 Example:
 
 ```cpp
-static_assert(std::get<0>(unicode_version) == 17);
-static_assert(std::get<1>(unicode_version) == 0);
-static_assert(std::get<2>(unicode_version) == 0);
+static_assert(std::get<0>(utf8_ranges::unicode_version) == 17);
+static_assert(std::get<1>(utf8_ranges::unicode_version) == 0);
+static_assert(std::get<2>(utf8_ranges::unicode_version) == 0);
 ```
 
 ## Quick start
@@ -94,7 +100,8 @@ Suppose you have UTF-8 text such as `café €`, and you want to:
 #include <array>
 #include <string>
 
-using namespace literals;
+using namespace utf8_ranges;
+using namespace utf8_ranges::literals;
 
 // Compile time validation of UTF-8 string literals.
 constexpr auto text = "café €"_utf8_sv;
@@ -124,7 +131,8 @@ The library is also `constexpr`-friendly. UTF-8 literals and many operations may
 ```cpp
 #include "utf8_ranges.hpp"
 
-using namespace literals;
+using namespace utf8_ranges;
+using namespace utf8_ranges::literals;
 
 constexpr utf8_char euro = "€"_u8c;
 constexpr auto text = "Aé€"_utf8_sv;
@@ -138,7 +146,8 @@ static_assert(text.char_count() == 3);
 Another literal example:
 
 ```cpp
-using namespace literals;
+using namespace utf8_ranges;
+using namespace utf8_ranges::literals;
 
 constexpr utf8_char euro = "€"_u8c;
 constexpr utf8_string_view text = "Aé€"_utf8_sv;
@@ -156,7 +165,8 @@ Printing and formatting are also supported for the library UTF-8 string types:
 #include <format>
 #include <sstream>
 
-using namespace literals;
+using namespace utf8_ranges;
+using namespace utf8_ranges::literals;
 
 const utf8_string text = "café €"_utf8_s;
 
@@ -193,6 +203,8 @@ These are returned by checked construction APIs such as `utf8_string_view::from_
 Example:
 
 ```cpp
+using namespace utf8_ranges;
+
 const std::array<char8_t, 3> invalid_bytes{
     static_cast<char8_t>(0xE2),
     static_cast<char8_t>(0x28),
@@ -643,7 +655,7 @@ Complexity:
 constexpr auto chars() const noexcept;
 ```
 
-Returns a `views::utf8_view` over the contained Unicode scalar values.
+Returns a `utf8_ranges::views::utf8_view` over the contained Unicode scalar values.
 
 Preconditions:
 
@@ -660,7 +672,7 @@ Complexity:
 constexpr auto reversed_chars() const noexcept;
 ```
 
-Returns a `views::reversed_utf8_view` over the contained Unicode scalar values, in reverse order.
+Returns a `utf8_ranges::views::reversed_utf8_view` over the contained Unicode scalar values, in reverse order.
 
 Preconditions:
 
@@ -1129,7 +1141,8 @@ Remarks:
 Example:
 
 ```cpp
-using namespace literals;
+using namespace utf8_ranges;
+using namespace utf8_ranges::literals;
 
 utf8_string s{ "AÃ©â‚¬"_utf8_sv };
 s.push_back("!"_u8c);
@@ -1140,7 +1153,7 @@ assert(s.ends_with("!"_u8c));
 
 ## Reference: views
 
-### `views::utf8_view`
+### `utf8_ranges::views::utf8_view`
 
 Unchecked forward view over valid UTF-8 bytes.
 
@@ -1158,7 +1171,7 @@ Semantics:
 - dereferencing yields `utf8_char` by value
 - increment uses the current UTF-8 lead byte to advance
 
-### `views::reversed_utf8_view`
+### `utf8_ranges::views::reversed_utf8_view`
 
 Unchecked forward view that yields the same characters in reverse order.
 
@@ -1177,7 +1190,7 @@ Semantics:
 - `begin()` positions at the last UTF-8 character
 - increment walks backward to the previous UTF-8 lead byte
 
-### `views::lossy_utf8_view<CharT>`
+### `utf8_ranges::views::lossy_utf8_view<CharT>`
 
 Lossy forward view over arbitrary integral code units.
 
@@ -1193,7 +1206,7 @@ Semantics:
 - malformed input yields `utf8_char::replacement_character`
 - the iterator advances by the valid character width, or by one code unit when replacement was produced
 
-### `views::lossy_utf8`
+### `utf8_ranges::views::lossy_utf8`
 
 Adaptor closure for `lossy_utf8_view`.
 
@@ -1222,7 +1235,8 @@ Validation is performed at compile time.
 Examples:
 
 ```cpp
-using namespace literals;
+using namespace utf8_ranges;
+using namespace utf8_ranges::literals;
 
 constexpr utf8_char a = "A"_u8c;
 constexpr utf8_char e_acute = "Ã©"_u8c;
@@ -1238,7 +1252,8 @@ Validation is performed at compile time.
 Examples:
 
 ```cpp
-using namespace literals;
+using namespace utf8_ranges;
+using namespace utf8_ranges::literals;
 
 constexpr auto a = "AÃ©â‚¬"_utf8_sv;
 constexpr auto b = "AÃ©â‚¬"_utf8_sv;
@@ -1253,7 +1268,8 @@ Validation is performed at compile time.
 Example:
 
 ```cpp
-using namespace literals;
+using namespace utf8_ranges;
+using namespace utf8_ranges::literals;
 
 const auto owned = "Hello"_utf8_s;
 ```

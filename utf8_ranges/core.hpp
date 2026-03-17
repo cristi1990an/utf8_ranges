@@ -24,6 +24,9 @@
 
 #include <uchar.h>
 
+namespace utf8_ranges
+{
+
 class utf8_string_view;
 
 template <typename Allocator = std::allocator<char8_t>>
@@ -319,7 +322,7 @@ namespace details
 			{
 				std::ranges::copy(pp, p);
 
-				if (!::is_single_valid_utf8_char(std::basic_string_view<CharT>{ &p[0], N - 1 }))
+				if (!is_single_valid_utf8_char(std::basic_string_view<CharT>{ &p[0], N - 1 }))
 				{
 					throw std::invalid_argument("literal must contain exactly one valid UTF-8 character");
 				}
@@ -352,4 +355,6 @@ namespace details
 			}
 		};
 	}
+}
+
 }

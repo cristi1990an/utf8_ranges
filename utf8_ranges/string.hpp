@@ -2,6 +2,9 @@
 
 #include "views.hpp"
 
+namespace utf8_ranges
+{
+
 template <typename Derived, typename View>
 class utf8_string_crtp
 {
@@ -479,22 +482,24 @@ inline constexpr utf8_string_view utf8_char::as_utf8_view() const noexcept
 	return utf8_string_view::from_bytes_unchecked(as_view());
 }
 
+}
+
 namespace std
 {
 	template<>
-	struct hash<utf8_string_view>
+	struct hash<utf8_ranges::utf8_string_view>
 	{
-		std::size_t operator()(utf8_string_view value) const noexcept
+		std::size_t operator()(utf8_ranges::utf8_string_view value) const noexcept
 		{
 			return std::hash<std::u8string_view>{}(value.base());
 		}
 	};
 
 	template<>
-	struct formatter<utf8_string_view, char> : formatter<std::string_view, char>
+	struct formatter<utf8_ranges::utf8_string_view, char> : formatter<std::string_view, char>
 	{
 		template<typename FormatContext>
-		auto format(utf8_string_view value, FormatContext& ctx) const
+		auto format(utf8_ranges::utf8_string_view value, FormatContext& ctx) const
 		{
 			const auto text = value.base();
 			return formatter<std::string_view, char>::format(
@@ -504,15 +509,18 @@ namespace std
 	};
 
 	template<typename Allocator>
-	struct formatter<utf8_string<Allocator>, char> : formatter<utf8_string_view, char>
+	struct formatter<utf8_ranges::utf8_string<Allocator>, char> : formatter<utf8_ranges::utf8_string_view, char>
 	{
 		template<typename FormatContext>
-		auto format(const utf8_string<Allocator>& value, FormatContext& ctx) const
+		auto format(const utf8_ranges::utf8_string<Allocator>& value, FormatContext& ctx) const
 		{
-			return formatter<utf8_string_view, char>::format(value.as_view(), ctx);
+			return formatter<utf8_ranges::utf8_string_view, char>::format(value.as_view(), ctx);
 		}
 	};
 }
+
+namespace utf8_ranges
+{
 
 namespace literals
 {
@@ -539,4 +547,6 @@ namespace literals
 		}
 		return utf8_string(result.value());
 	}
+}
+
 }

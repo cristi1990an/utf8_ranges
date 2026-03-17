@@ -9,7 +9,8 @@
 #include <sstream>
 #include <string>
 
-using namespace literals;
+using namespace utf8_ranges;
+using namespace utf8_ranges::literals;
 
 inline void run_utf8_ranges_tests()
 {
