@@ -7,7 +7,8 @@ on:
   pull_request:
 
 jobs:
-  build-and-test:
+  msvc:
+    name: MSVC (C++23)
     runs-on: windows-latest
 
     steps:
@@ -22,3 +23,30 @@ jobs:
 
       - name: Run tests
         run: .\x64\Release\utf8_ranges.exe
+
+  linux:
+    name: ${{ matrix.name }} (C++23)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: GCC
+            cxx: g++
+            output: utf8_ranges_gcc
+          - name: Clang
+            cxx: clang++
+            output: utf8_ranges_clang
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Show compiler version
+        run: ${{ matrix.cxx }} --version
+
+      - name: Build
+        run: ${{ matrix.cxx }} -std=c++23 -O2 -Wall -Wextra -pedantic source.cpp -o ${{ matrix.output }}
+
+      - name: Run tests
+        run: ./${{ matrix.output }}
