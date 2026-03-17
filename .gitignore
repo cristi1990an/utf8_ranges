@@ -1,0 +1,11 @@
+.vs/
+.vscode/
+x64/
+*.user
+*.pdb
+*.ilk
+*.obj
+*.ipch
+*.tlog/
+*.lastbuildstate
+*.log

@@ -1,0 +1,7 @@
+<Solution>
+  <Configurations>
+    <Platform Name="x64" />
+    <Platform Name="x86" />
+  </Configurations>
+  <Project Path="utf8_ranges.vcxproj" Id="145ebcbd-1896-42ae-ad89-d25964826d92" />
+</Solution>
