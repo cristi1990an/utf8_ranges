@@ -26,6 +26,23 @@ jobs:
       - name: Run tests
         run: .\x64\Release\utf8_ranges.exe
 
+  clang-cl:
+    name: Clang-cl (C++23)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Build
+        run: msbuild utf8_ranges.vcxproj /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=ClangCL
+
+      - name: Run tests
+        run: .\x64\Release\utf8_ranges.exe
+
   linux:
     name: ${{ matrix.name }} (C++23)
     runs-on: ubuntu-24.04
