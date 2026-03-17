@@ -10,8 +10,14 @@ on:
 
 jobs:
   msvc:
-    name: MSVC (C++23)
+    name: MSVC (${{ matrix.configuration }}, C++23)
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - configuration: Debug
+          - configuration: Release
 
     steps:
       - name: Checkout
@@ -21,14 +27,20 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Build
-        run: msbuild utf8_ranges.vcxproj /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=v143
+        run: msbuild utf8_ranges.vcxproj /p:Configuration=${{ matrix.configuration }} /p:Platform=x64 /p:PlatformToolset=v143
 
       - name: Run tests
-        run: .\x64\Release\utf8_ranges.exe
+        run: .\x64\${{ matrix.configuration }}\utf8_ranges.exe
 
   clang-cl:
-    name: Clang-cl (C++23)
+    name: Clang-cl (${{ matrix.configuration }}, C++23)
     runs-on: windows-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - configuration: Debug
+          - configuration: Release
 
     steps:
       - name: Checkout
@@ -38,41 +50,151 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Build
-        run: msbuild utf8_ranges.vcxproj /p:Configuration=Release /p:Platform=x64 /p:PlatformToolset=ClangCL
+        run: msbuild utf8_ranges.vcxproj /p:Configuration=${{ matrix.configuration }} /p:Platform=x64 /p:PlatformToolset=ClangCL
 
       - name: Run tests
-        run: .\x64\Release\utf8_ranges.exe
+        run: .\x64\${{ matrix.configuration }}\utf8_ranges.exe
 
   linux:
-    name: ${{ matrix.name }} (C++23)
+    name: ${{ matrix.name }} (${{ matrix.opt_name }}${{ matrix.sanitizer_name }}, C++23)
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         include:
           - name: GCC
+            install_kind: gcc
             packages: g++-14
             cxx: g++-14
             cxxflags: ""
-            output: utf8_ranges_gcc
+            output: utf8_ranges_gcc_o0
+            opt_name: O0
+            opt_flags: "-O0"
+            sanitizer_name: ""
+            sanitizer_flags: ""
+            asan_options: ""
+            ubsan_options: ""
+          - name: GCC
+            install_kind: gcc
+            packages: g++-14
+            cxx: g++-14
+            cxxflags: ""
+            output: utf8_ranges_gcc_o2
+            opt_name: O2
+            opt_flags: "-O2"
+            sanitizer_name: ""
+            sanitizer_flags: ""
+            asan_options: ""
+            ubsan_options: ""
+          - name: GCC
+            install_kind: gcc
+            packages: g++-14
+            cxx: g++-14
+            cxxflags: ""
+            output: utf8_ranges_gcc_o3
+            opt_name: O3
+            opt_flags: "-O3"
+            sanitizer_name: ""
+            sanitizer_flags: ""
+            asan_options: ""
+            ubsan_options: ""
+          - name: GCC
+            install_kind: gcc
+            packages: g++-14
+            cxx: g++-14
+            cxxflags: ""
+            output: utf8_ranges_gcc_o0_san
+            opt_name: O0
+            opt_flags: "-O0"
+            sanitizer_name: ", ASan+UBSan"
+            sanitizer_flags: "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
+            asan_options: "detect_leaks=1"
+            ubsan_options: "print_stacktrace=1"
+          - name: GCC
+            install_kind: gcc
+            packages: g++-14
+            cxx: g++-14
+            cxxflags: ""
+            output: utf8_ranges_gcc_o2_san
+            opt_name: O2
+            opt_flags: "-O2"
+            sanitizer_name: ", ASan+UBSan"
+            sanitizer_flags: "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
+            asan_options: "detect_leaks=1"
+            ubsan_options: "print_stacktrace=1"
+          - name: GCC
+            install_kind: gcc
+            packages: g++-14
+            cxx: g++-14
+            cxxflags: ""
+            output: utf8_ranges_gcc_o3_san
+            opt_name: O3
+            opt_flags: "-O3"
+            sanitizer_name: ", ASan+UBSan"
+            sanitizer_flags: "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
+            asan_options: "detect_leaks=1"
+            ubsan_options: "print_stacktrace=1"
           - name: Clang trunk
+            install_kind: clang
             packages: clang-22 libc++-22-dev libc++abi-22-dev
             cxx: clang++-22
             cxxflags: "-stdlib=libc++"
-            output: utf8_ranges_clang
+            output: utf8_ranges_clang_o0
+            opt_name: O0
+            opt_flags: "-O0"
+            sanitizer_name: ""
+            sanitizer_flags: ""
+            asan_options: ""
+            ubsan_options: ""
+          - name: Clang trunk
+            install_kind: clang
+            packages: clang-22 libc++-22-dev libc++abi-22-dev
+            cxx: clang++-22
+            cxxflags: "-stdlib=libc++"
+            output: utf8_ranges_clang_o2
+            opt_name: O2
+            opt_flags: "-O2"
+            sanitizer_name: ""
+            sanitizer_flags: ""
+            asan_options: ""
+            ubsan_options: ""
+          - name: Clang trunk
+            install_kind: clang
+            packages: clang-22 libc++-22-dev libc++abi-22-dev
+            cxx: clang++-22
+            cxxflags: "-stdlib=libc++"
+            output: utf8_ranges_clang_o0_san
+            opt_name: O0
+            opt_flags: "-O0"
+            sanitizer_name: ", ASan+UBSan"
+            sanitizer_flags: "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
+            asan_options: "detect_leaks=1"
+            ubsan_options: "print_stacktrace=1"
+          - name: Clang trunk
+            install_kind: clang
+            packages: clang-22 libc++-22-dev libc++abi-22-dev
+            cxx: clang++-22
+            cxxflags: "-stdlib=libc++"
+            output: utf8_ranges_clang_o2_san
+            opt_name: O2
+            opt_flags: "-O2"
+            sanitizer_name: ", ASan+UBSan"
+            sanitizer_flags: "-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
+            asan_options: "detect_leaks=1"
+            ubsan_options: "print_stacktrace=1"
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install GCC
-        if: matrix.name == 'GCC'
+        if: matrix.install_kind == 'gcc'
         run: |
           sudo apt-get update
           sudo apt-get install -y ${{ matrix.packages }}
 
       - name: Install Clang trunk
-        if: matrix.name == 'Clang trunk'
+        if: matrix.install_kind == 'clang'
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
@@ -83,7 +205,10 @@ jobs:
         run: ${{ matrix.cxx }} --version
 
       - name: Build
-        run: ${{ matrix.cxx }} -std=c++23 -O2 -Wall -Wextra -pedantic ${{ matrix.cxxflags }} source.cpp -o ${{ matrix.output }}
+        run: ${{ matrix.cxx }} -std=c++23 ${{ matrix.opt_flags }} -Wall -Wextra -pedantic ${{ matrix.cxxflags }} ${{ matrix.sanitizer_flags }} source.cpp -o ${{ matrix.output }}
 
       - name: Run tests
         run: ./${{ matrix.output }}
+        env:
+          ASAN_OPTIONS: ${{ matrix.asan_options }}
+          UBSAN_OPTIONS: ${{ matrix.ubsan_options }}
