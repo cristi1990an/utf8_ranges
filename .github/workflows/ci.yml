@@ -5,6 +5,8 @@ on:
     branches:
       - main
   pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
 
 jobs:
   msvc:
@@ -36,9 +38,9 @@ jobs:
             cxx: g++-14
             cxxflags: ""
             output: utf8_ranges_gcc
-          - name: Clang
-            packages: clang-18 libc++-18-dev libc++abi-18-dev
-            cxx: clang++-18
+          - name: Clang trunk
+            packages: clang-22 libc++-22-dev libc++abi-22-dev
+            cxx: clang++-22
             cxxflags: "-stdlib=libc++"
             output: utf8_ranges_clang
 

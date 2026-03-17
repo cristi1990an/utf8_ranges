@@ -1,6 +1,6 @@
 ﻿# utf8_ranges
 
-`utf8_ranges` is a header-only C++ library for working with UTF-8 as UTF-8.
+`utf8_ranges` is a header-only C++ library for representing, validating, iterating, and formatting UTF-8 text in C++.
 
 The library models UTF-8 text in a few distinct layers:
 
