@@ -22,6 +22,7 @@ namespace
 int main()
 {
 	enable_utf8_console();
+	run_utf8_ranges_tests();
 
 	constexpr auto text = "café €"_utf8_sv;
 
