@@ -541,7 +541,6 @@ public:
 		return ascii_lowercase() == other.ascii_lowercase();
 	}
 
-	[[nodiscard]]
 	constexpr void swap(utf8_char& other) noexcept
 	{
 		bytes_.swap(other.bytes_);
