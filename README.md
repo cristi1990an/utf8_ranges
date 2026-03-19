@@ -359,7 +359,7 @@ For compile-time construction from UTF-8 source text, prefer the `_u8c` literal:
 
 ```cpp
 constexpr utf8_char a = "A"_u8c;
-constexpr utf8_char euro = "â‚¬"_u8c;
+constexpr utf8_char euro = "€"_u8c;
 ```
 
 #### `from_scalar_unchecked`
@@ -434,9 +434,9 @@ Example:
 
 ```cpp
 static_assert("A"_u8c.byte_count() == 1);
-static_assert("Ã©"_u8c.byte_count() == 2);
-static_assert("â‚¬"_u8c.byte_count() == 3);
-static_assert("ðŸ˜€"_u8c.byte_count() == 4);
+static_assert("é"_u8c.byte_count() == 2);
+static_assert("€"_u8c.byte_count() == 3);
+static_assert("😀"_u8c.byte_count() == 4);
 ```
 
 ### Encoding
@@ -461,7 +461,7 @@ Example:
 
 ```cpp
 std::array<char, 4> buffer{};
-const auto n = "â‚¬"_u8c.encode_utf8<char>(buffer.begin());
+const auto n = "€"_u8c.encode_utf8<char>(buffer.begin());
 assert(std::string_view{ buffer.data(), n } == "\xE2\x82\xAC");
 ```
 
@@ -504,12 +504,12 @@ They are versioned by [`unicode_version`](#unicode-version).
 Examples:
 
 ```cpp
-assert("Î©"_u8c.is_alphabetic());
-assert("Î©"_u8c.is_uppercase());
-assert("Ï‰"_u8c.is_lowercase());
+assert("Ω"_u8c.is_alphabetic());
+assert("Ω"_u8c.is_uppercase());
+assert("ω"_u8c.is_lowercase());
 assert("5"_u8c.is_digit());
-assert("â…§"_u8c.is_numeric());
-assert("â€"_u8c.is_whitespace());
+assert("Ⅷ"_u8c.is_numeric());
+assert(" "_u8c.is_whitespace());
 assert(utf8_char::from_scalar_unchecked(0x0085).is_control());
 ```
 
@@ -1004,7 +1004,7 @@ That distinction matters.
 Example:
 
 ```cpp
-constexpr auto text = "AÃ©â‚¬"_utf8_sv;
+constexpr auto text = "Aé€"_utf8_sv;
 
 assert(text.size() == 6);
 assert(text.char_count() == 3);
@@ -1012,7 +1012,7 @@ assert(text.char_count() == 3);
 assert(text.is_char_boundary(1));
 assert(!text.is_char_boundary(2));
 
-assert(text.substr(1).value() == "Ã©â‚¬"_utf8_sv);
+assert(text.substr(1).value() == "é€"_utf8_sv);
 assert(!text.substr(2, 1).has_value());
 ```
 
@@ -1144,7 +1144,7 @@ Example:
 using namespace utf8_ranges;
 using namespace utf8_ranges::literals;
 
-utf8_string s{ "AÃ©â‚¬"_utf8_sv };
+utf8_string s{ "Aé€"_utf8_sv };
 s.push_back("!"_u8c);
 
 assert(s.char_count() == 4);
@@ -1239,8 +1239,8 @@ using namespace utf8_ranges;
 using namespace utf8_ranges::literals;
 
 constexpr utf8_char a = "A"_u8c;
-constexpr utf8_char e_acute = "Ã©"_u8c;
-constexpr utf8_char euro = "â‚¬"_u8c;
+constexpr utf8_char e_acute = "é"_u8c;
+constexpr utf8_char euro = "€"_u8c;
 ```
 
 ### `operator ""_utf8_sv`
@@ -1255,8 +1255,8 @@ Examples:
 using namespace utf8_ranges;
 using namespace utf8_ranges::literals;
 
-constexpr auto a = "AÃ©â‚¬"_utf8_sv;
-constexpr auto b = "AÃ©â‚¬"_utf8_sv;
+constexpr auto a = "Aé€"_utf8_sv;
+constexpr auto b = "Aé€"_utf8_sv;
 ```
 
 ### `operator ""_utf8_s`
@@ -1290,7 +1290,9 @@ Examples:
 
 ```cpp
 assert(std::format("{}", "A"_u8c) == "A");
-assert(std::format("{:c}", "â‚¬"_u8c) == "â‚¬");
+assert(std::format("{:c}", "€"_u8c) == "€");
+assert(std::format("{:>4c}", "€"_u8c) == "   €");
+assert(std::format("{:*^5c}", "é"_u8c) == "**é**");
 assert(std::format("{:#06x}", "A"_u8c) == "0x0041");
 assert(std::format("{:#010b}", "A"_u8c) == "0b01000001");
 ```
@@ -1308,8 +1310,10 @@ Formatting delegates to the existing `std::string_view` formatter over the under
 Example:
 
 ```cpp
-constexpr auto text = "AÃ©â‚¬"_utf8_sv;
-assert(std::format("{}", text) == "AÃ©â‚¬");
+constexpr auto text = "Aé€"_utf8_sv;
+assert(std::format("{}", text) == "Aé€");
+assert(std::format("{:>6}", text) == "   Aé€");
+assert(std::format("{:_<6}", text) == "Aé€___");
 ```
 
 ## Semantics notes
