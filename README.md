@@ -55,17 +55,26 @@ The library is not a grapheme cluster library. A single user-perceived "characte
 
 ## Requirements
 
-The project currently builds with MSVC in `/std:c++latest` mode.
+This library requires a compiler and standard library with strong C++23 support.
 
-The implementation uses modern language and library facilities, including:
+The implementation relies on language and library facilities including:
 
 - `char8_t`
 - `std::expected`
 - `std::format`
 - ranges and views
 - `std::ranges::range_adaptor_closure`
+- `std::views::enumerate`
 
-In practice, use a compiler and standard library with strong C++23/C++26 support.
+The following versions are the minimum toolchains currently tested in CI:
+
+- MSVC with the MSVC STL: Visual Studio 2022 toolset `v143` or newer
+- Clang-cl with the MSVC STL: the `ClangCL` toolset shipped with current Visual Studio 2022 builds
+- GCC with libstdc++: GCC 14 / libstdc++ 14 or newer
+
+These are minimum tested versions, not guaranteed absolute minimum versions. Older toolchains may work, but are not currently part of the test matrix.
+
+Clang with `libc++` is not currently listed as a supported configuration. As of the current CI setup, `libc++` still does not provide all of the C++23 ranges facilities required by this library, in particular `std::views::enumerate`.
 
 ## Unicode version
 
