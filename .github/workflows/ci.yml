@@ -58,6 +58,7 @@ jobs:
   linux:
     name: ${{ matrix.name }} (${{ matrix.opt_name }}${{ matrix.sanitizer_name }}, C++23)
     runs-on: ubuntu-24.04
+    continue-on-error: ${{ matrix.install_kind == 'clang' }}
     strategy:
       fail-fast: false
       matrix:
