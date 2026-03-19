@@ -76,6 +76,16 @@ inline void run_utf8_ranges_tests()
 	static_assert(utf8_text.substr(1).value() == u8"\u00E9\u20AC"_utf8_sv);
 	static_assert(utf8_text.substr(1, 2).value() == u8"\u00E9"_utf8_sv);
 	static_assert(!utf8_text.substr(2, 1).has_value());
+	static_assert(utf8_text.starts_with('A'));
+	static_assert(utf8_text.starts_with(u8'A'));
+	static_assert(utf8_text.starts_with("A"_u8c));
+	static_assert(utf8_text.starts_with("A"_utf8_sv));
+	static_assert(!utf8_text.starts_with("é"_u8c));
+	static_assert(!utf8_text.ends_with('A'));
+	static_assert(!utf8_text.ends_with(u8'A'));
+	static_assert(utf8_text.ends_with("€"_u8c));
+	static_assert(utf8_text.ends_with("€"_utf8_sv));
+	static_assert(!utf8_text.ends_with("é"_u8c));
 	static_assert(utf8_string_view::from_bytes(u8"A\u00E9\u20AC").has_value());
 	static_assert([] {
 		const std::array<char8_t, 3> invalid_bytes{

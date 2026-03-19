@@ -973,6 +973,19 @@ Returns `true` if the view ends with the supplied suffix.
 
 For the `char8_t` overload, the comparison is against a single UTF-8 code unit. In practice this is mainly useful for ASCII suffixes; use `utf8_char` or `utf8_string_view` for general Unicode suffixes.
 
+Example:
+
+```cpp
+using namespace utf8_ranges;
+using namespace utf8_ranges::literals;
+
+constexpr auto text = "Aé€"_utf8_sv;
+
+static_assert(text.ends_with("€"_u8c));
+static_assert(text.ends_with("€"_utf8_sv));
+static_assert(!text.ends_with("é"_u8c));
+```
+
 Preconditions:
 
 - None
