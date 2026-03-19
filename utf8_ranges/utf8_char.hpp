@@ -1,4 +1,5 @@
-#pragma once
+#ifndef UTF8_RANGES_UTF8_CHAR_HPP
+#define UTF8_RANGES_UTF8_CHAR_HPP
 
 #include "core.hpp"
 #include "unicode_tables.hpp"
@@ -832,3 +833,5 @@ namespace std
 		}
 	};
 }
+
+#endif // UTF8_RANGES_UTF8_CHAR_HPP

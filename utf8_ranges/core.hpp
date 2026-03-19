@@ -1,4 +1,5 @@
-#pragma once
+#ifndef UTF8_RANGES_CORE_HPP
+#define UTF8_RANGES_CORE_HPP
 
 #include <ranges>
 #include <algorithm>
@@ -353,3 +354,5 @@ namespace details
 }
 
 }
+
+#endif // UTF8_RANGES_CORE_HPP

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef UTF8_RANGES_STRING_HPP
+#define UTF8_RANGES_STRING_HPP
 
 #include "views.hpp"
 
@@ -148,15 +149,18 @@ public:
 
 	constexpr std::optional<utf8_char> char_at(size_type index) const noexcept
 	{
-		for (const auto& [idx, ch] : char_indices())
+		if (index >= size() || !is_char_boundary(index)) [[unlikely]]
 		{
-			if (idx == index) [[unlikely]]
-			{
-				return ch;
-			}
+			return std::nullopt;
 		}
 
-		return std::nullopt;
+		return char_at_unchecked(index);
+	}
+
+	constexpr utf8_char char_at_unchecked(size_type index) const noexcept
+	{
+		const auto len = details::utf8_byte_count_from_lead(static_cast<std::uint8_t>(byte_view()[index]));
+		return utf8_char::from_utf8_bytes_unchecked(byte_view().data() + index, len);
 	}
 
 	constexpr std::optional<View> substr(size_type pos, size_type count = npos) const noexcept
@@ -309,6 +313,7 @@ class utf8_string : public utf8_string_crtp<utf8_string<Allocator>, utf8_string_
 
 public:
 	using base_class = utf8_string_crtp<utf8_string<Allocator>, utf8_string_view>;
+	using allocator_type = Allocator;
 	using value_type = char8_t;
 	using size_type = typename base_class::size_type;
 	using difference_type = typename base_class::difference_type;
@@ -443,6 +448,12 @@ public:
 	}
 
 	[[nodiscard]]
+	constexpr allocator_type get_allocator() const noexcept
+	{
+		return base_.get_allocator();
+	}
+
+	[[nodiscard]]
 	constexpr size_type size() const
 	{
 		return base_.size();
@@ -453,6 +464,144 @@ public:
 		const auto bytes_to_remove = (*(this->reversed_chars().begin())).byte_count();
 		const auto where_idx = base_.size() - bytes_to_remove;
 		base_.erase(where_idx, bytes_to_remove);
+	}
+
+	constexpr utf8_string& erase(size_type index, size_type count = npos)
+	{
+		if (index > size()) [[unlikely]]
+		{
+			throw std::out_of_range("erase index out of range");
+		}
+
+		const auto remaining = size() - index;
+		const auto erase_count = (count == npos || count > remaining) ? remaining : count;
+		const auto end = index + erase_count;
+
+		if (!this->is_char_boundary(index) || !this->is_char_boundary(end)) [[unlikely]]
+		{
+			throw std::out_of_range("erase range must be a valid UTF-8 substring");
+		}
+
+		base_.erase(index, erase_count);
+		return *this;
+	}
+
+	constexpr utf8_string& replace(size_type pos, size_type count, utf8_string_view other)
+	{
+		if (pos > size()) [[unlikely]]
+		{
+			throw std::out_of_range("replace index out of range");
+		}
+
+		const auto remaining = size() - pos;
+		const auto replace_count = (count == npos || count > remaining) ? remaining : count;
+		const auto end = pos + replace_count;
+
+		if (!this->is_char_boundary(pos) || !this->is_char_boundary(end)) [[unlikely]]
+		{
+			throw std::out_of_range("replace range must be a valid UTF-8 substring");
+		}
+
+		base_.replace(pos, replace_count, other.base());
+		return *this;
+	}
+
+	constexpr utf8_string& replace(size_type pos, size_type count, utf8_char other)
+	{
+		return replace(pos, count, other.as_utf8_view());
+	}
+
+	constexpr utf8_string& replace(size_type pos, utf8_string_view other)
+	{
+		if (pos >= size()) [[unlikely]]
+		{
+			throw std::out_of_range("replace index out of range");
+		}
+
+		if (!this->is_char_boundary(pos)) [[unlikely]]
+		{
+			throw std::out_of_range("replace index must be at a UTF-8 character boundary");
+		}
+
+		const auto replace_count = this->char_at_unchecked(pos).byte_count();
+		base_.replace(pos, replace_count, other.base());
+		return *this;
+	}
+
+	constexpr utf8_string& replace(size_type pos, utf8_char other)
+	{
+		if (pos >= size()) [[unlikely]]
+		{
+			throw std::out_of_range("replace index out of range");
+		}
+
+		if (!this->is_char_boundary(pos)) [[unlikely]]
+		{
+			throw std::out_of_range("replace index must be at a UTF-8 character boundary");
+		}
+
+		const auto replace_count = this->char_at_unchecked(pos).byte_count();
+		base_.replace(pos, replace_count, other.as_view());
+		return *this;
+	}
+
+	template <details::container_compatible_range<utf8_char> R>
+	constexpr utf8_string& replace_with_range(size_type pos, size_type count, R&& rg)
+	{
+		if (pos > size()) [[unlikely]]
+		{
+			throw std::out_of_range("replace index out of range");
+		}
+
+		const auto remaining = size() - pos;
+		const auto replace_count = (count == npos || count > remaining) ? remaining : count;
+		const auto end = pos + replace_count;
+
+		if (!this->is_char_boundary(pos) || !this->is_char_boundary(end)) [[unlikely]]
+		{
+			throw std::out_of_range("replace range must be a valid UTF-8 substring");
+		}
+
+		auto replacement = std::forward<R>(rg)
+			| std::views::transform([](auto&& ch)
+				{
+					return encoded_utf8_char_range{ static_cast<utf8_char>(std::forward<decltype(ch)>(ch)) };
+				})
+			| std::views::join;
+
+		base_.replace_with_range(
+			base_.begin() + static_cast<difference_type>(pos),
+			base_.begin() + static_cast<difference_type>(end),
+			replacement);
+		return *this;
+	}
+
+	template <details::container_compatible_range<utf8_char> R>
+	constexpr utf8_string& replace_with_range(size_type pos, R&& rg)
+	{
+		if (pos >= size()) [[unlikely]]
+		{
+			throw std::out_of_range("replace index out of range");
+		}
+
+		if (!this->is_char_boundary(pos)) [[unlikely]]
+		{
+			throw std::out_of_range("replace index must be at a UTF-8 character boundary");
+		}
+
+		const auto replace_count = this->char_at_unchecked(pos).byte_count();
+		auto replacement = std::forward<R>(rg)
+			| std::views::transform([](auto&& ch)
+				{
+					return encoded_utf8_char_range{ static_cast<utf8_char>(std::forward<decltype(ch)>(ch)) };
+				})
+			| std::views::join;
+
+		base_.replace_with_range(
+			base_.begin() + static_cast<difference_type>(pos),
+			base_.begin() + static_cast<difference_type>(pos + replace_count),
+			replacement);
+		return *this;
 	}
 
 	constexpr void reserve(size_type new_cap)
@@ -515,6 +664,21 @@ public:
 	}
 
 private:
+	struct encoded_utf8_char_range
+	{
+		utf8_char ch;
+
+		constexpr auto begin() const noexcept
+		{
+			return ch.as_view().begin();
+		}
+
+		constexpr auto end() const noexcept
+		{
+			return ch.as_view().end();
+		}
+	};
+
 	base_type base_;
 };
 
@@ -572,6 +736,11 @@ namespace std
 			return formatter<utf8_ranges::utf8_string_view, char>::format(value.as_view(), ctx);
 		}
 	};
+
+	template<typename Allocator, typename OtherAllocator>
+	struct uses_allocator<utf8_ranges::utf8_string<Allocator>, OtherAllocator> : true_type
+	{
+	};
 }
 
 namespace utf8_ranges
@@ -605,3 +774,5 @@ namespace literals
 }
 
 }
+
+#endif // UTF8_RANGES_STRING_HPP

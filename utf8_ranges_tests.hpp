@@ -1,4 +1,5 @@
-#pragma once
+#ifndef UTF8_RANGES_TESTS_HPP
+#define UTF8_RANGES_TESTS_HPP
 
 #include "utf8_ranges.hpp"
 
@@ -14,8 +15,8 @@ using namespace utf8_ranges::literals;
 
 inline void run_utf8_ranges_tests()
 {
-	constexpr utf8_char latin1_ch = u8"\u00E9"_u8c;
-	constexpr auto utf8_text = u8"A\u00E9\u20AC"_utf8_sv;
+	constexpr utf8_char latin1_ch = "é"_u8c;
+	constexpr auto utf8_text = "Aé€"_utf8_sv;
 
 	static_assert("A"_u8c.ascii_lowercase() == "a"_u8c);
 	static_assert("z"_u8c.ascii_uppercase() == "Z"_u8c);
@@ -33,17 +34,17 @@ inline void run_utf8_ranges_tests()
 	static_assert("\n"_u8c.is_ascii_whitespace());
 	static_assert(!"A"_u8c.is_ascii_whitespace());
 
-	static_assert(u8"\u03A9"_u8c.is_alphabetic());
-	static_assert(u8"\u03A9"_u8c.is_alphanumeric());
-	static_assert(u8"\u03A9"_u8c.is_uppercase());
-	static_assert(!u8"\u03A9"_u8c.is_lowercase());
-	static_assert(u8"\u03C9"_u8c.is_lowercase());
-	static_assert(!u8"\u03C9"_u8c.is_uppercase());
+	static_assert("Ω"_u8c.is_alphabetic());
+	static_assert("Ω"_u8c.is_alphanumeric());
+	static_assert("Ω"_u8c.is_uppercase());
+	static_assert(!"Ω"_u8c.is_lowercase());
+	static_assert("ω"_u8c.is_lowercase());
+	static_assert(!"ω"_u8c.is_uppercase());
 	static_assert("5"_u8c.is_digit());
 	static_assert("5"_u8c.is_numeric());
-	static_assert(u8"\u2167"_u8c.is_numeric());
-	static_assert(!u8"\u2167"_u8c.is_digit());
-	static_assert(u8"\u2003"_u8c.is_whitespace());
+	static_assert("Ⅷ"_u8c.is_numeric());
+	static_assert(!"Ⅷ"_u8c.is_digit());
+	static_assert(" "_u8c.is_whitespace());
 	static_assert(utf8_char::from_scalar_unchecked(0x0085u).is_control());
 	static_assert("F"_u8c.is_ascii_hexdigit());
 	static_assert("7"_u8c.is_ascii_octdigit());
@@ -64,42 +65,37 @@ inline void run_utf8_ranges_tests()
 	}());
 
 	static_assert(utf8_text.size() == 6);
-	static_assert(utf8_text.as_view() == u8"A\u00E9\u20AC");
+	static_assert(utf8_text == "Aé€"_utf8_sv);
 	static_assert(utf8_text.is_char_boundary(0));
 	static_assert(utf8_text.is_char_boundary(1));
 	static_assert(!utf8_text.is_char_boundary(2));
-	static_assert(utf8_text.find(u8'A') == 0);
+	static_assert(utf8_text.char_at(0).has_value());
+	static_assert(utf8_text.char_at(0).value() == "A"_u8c);
+	static_assert(utf8_text.char_at(1).has_value());
+	static_assert(utf8_text.char_at(1).value() == "é"_u8c);
+	static_assert(!utf8_text.char_at(2).has_value());
+	static_assert(!utf8_text.char_at(utf8_text.size()).has_value());
+	static_assert(utf8_text.char_at_unchecked(3) == "€"_u8c);
+	static_assert(utf8_text.find(static_cast<char8_t>('A')) == 0);
 	static_assert(utf8_text.find("é"_u8c) == 1);
 	static_assert(utf8_text.find("€"_u8c) == 3);
 	static_assert(utf8_text.find("Z"_u8c) == utf8_string_view::npos);
 	static_assert(utf8_text.substr(1).has_value());
-	static_assert(utf8_text.substr(1).value() == u8"\u00E9\u20AC"_utf8_sv);
-	static_assert(utf8_text.substr(1, 2).value() == u8"\u00E9"_utf8_sv);
+	static_assert(utf8_text.substr(1).value() == "é€"_utf8_sv);
+	static_assert(utf8_text.substr(1, 2).value() == "é"_utf8_sv);
 	static_assert(!utf8_text.substr(2, 1).has_value());
 	static_assert(utf8_text.starts_with('A'));
-	static_assert(utf8_text.starts_with(u8'A'));
+	static_assert(utf8_text.starts_with(static_cast<char8_t>('A')));
 	static_assert(utf8_text.starts_with("A"_u8c));
 	static_assert(utf8_text.starts_with("A"_utf8_sv));
 	static_assert(!utf8_text.starts_with("é"_u8c));
 	static_assert(!utf8_text.ends_with('A'));
-	static_assert(!utf8_text.ends_with(u8'A'));
+	static_assert(!utf8_text.ends_with(static_cast<char8_t>('A')));
 	static_assert(utf8_text.ends_with("€"_u8c));
 	static_assert(utf8_text.ends_with("€"_utf8_sv));
 	static_assert(!utf8_text.ends_with("é"_u8c));
-	static_assert(utf8_string_view::from_bytes(u8"A\u00E9\u20AC").has_value());
-	static_assert([] {
-		const std::array<char8_t, 3> invalid_bytes{
-			static_cast<char8_t>(0xE2),
-			static_cast<char8_t>(0x28),
-			static_cast<char8_t>(0xA1)
-		};
-		const auto invalid = utf8_string_view::from_bytes(
-			std::u8string_view{ invalid_bytes.data(), invalid_bytes.size() });
-		return !invalid.has_value()
-			&& invalid.error().code == utf8_error_code::invalid_sequence
-			&& invalid.error().first_invalid_byte_index == 0;
-	}());
-	static_assert(utf8_text == u8"A\u00E9\u20AC"_utf8_sv);
+	static_assert(utf8_string_view::from_bytes("Aé€"_utf8_sv.as_view()).has_value());
+	static_assert(utf8_text == "Aé€"_utf8_sv);
 	static_assert(utf8_text < "Z"_utf8_sv);
 
 	static_assert([] {
@@ -148,8 +144,8 @@ inline void run_utf8_ranges_tests()
 
 	assert(std::format("{}", "A"_u8c) == "A");
 	assert(std::format("{:c}", latin1_ch) == "\xC3\xA9");
-	assert(std::format("{:c}", u8"\u20AC"_u8c) == "\xE2\x82\xAC");
-	assert(std::format("{:c}", u8"\U0001F600"_u8c) == "\xF0\x9F\x98\x80");
+	assert(std::format("{:c}", "€"_u8c) == "\xE2\x82\xAC");
+	assert(std::format("{:c}", "😀"_u8c) == "\xF0\x9F\x98\x80");
 
 	assert(std::format("{:d}", "A"_u8c) == "65");
 	assert(std::format("{:x}", latin1_ch) == "e9");
@@ -164,11 +160,187 @@ inline void run_utf8_ranges_tests()
 	assert(std::format("{:>6d}", latin1_ch) == "   233");
 
 	assert(utf8_string<>{}.base().empty());
-	assert(utf8_string<>{ utf8_text }.base() == u8"A\u00E9\u20AC");
+	static_assert(std::same_as<decltype(utf8_string<>{}.get_allocator()), std::allocator<char8_t>>);
+	assert(utf8_string<>{ utf8_text }.as_view() == "Aé€"_utf8_sv);
 	assert(std::format("{}", utf8_string<>{ utf8_text }) == "A\xC3\xA9\xE2\x82\xAC");
+	static_assert([] {
+		utf8_string s{ "Aé€"_utf8_sv };
+		s.erase(1, 2);
+		return s == "A€"_utf8_sv;
+	}());
+	static_assert([] {
+		utf8_string s{ "Aé€"_utf8_sv };
+		s.erase(1);
+		return s == "A"_utf8_sv;
+	}());
+	static_assert([] {
+		utf8_string s{ "Aé€"_utf8_sv };
+		s.replace(1, 2, "Ω"_utf8_sv);
+		return s == "AΩ€"_utf8_sv;
+	}());
+	static_assert([] {
+		utf8_string s{ "Aé€"_utf8_sv };
+		s.replace(1, 2, "Ω"_u8c);
+		return s == "AΩ€"_utf8_sv;
+	}());
+	static_assert([] {
+		utf8_string s{ "Aé€"_utf8_sv };
+		s.replace(1, "XYZ"_utf8_sv);
+		return s == "AXYZ€"_utf8_sv;
+	}());
+	static_assert([] {
+		utf8_string s{ "Aé€"_utf8_sv };
+		s.replace(1, "Ω"_u8c);
+		return s == "AΩ€"_utf8_sv;
+	}());
+	static_assert([] {
+		utf8_string s{ "Aé€"_utf8_sv };
+		s.replace_with_range(1, 2, std::array{ "Ω"_u8c, "!"_u8c });
+		return s == "AΩ!€"_utf8_sv;
+	}());
+	static_assert([] {
+		utf8_string s{ "Aé€"_utf8_sv };
+		s.replace_with_range(1, std::array{ "Ω"_u8c, "!"_u8c });
+		return s == "AΩ!€"_utf8_sv;
+	}());
+	{
+		utf8_string s{ utf8_text };
+		s.erase(s.size(), 1);
+		assert(s == utf8_text);
+	}
+	{
+		utf8_string s{ utf8_text };
+		bool threw = false;
+		try
+		{
+			s.erase(decltype(s)::npos);
+		}
+		catch (const std::out_of_range&)
+		{
+			threw = true;
+		}
+		assert(threw);
+	}
+	{
+		utf8_string s{ utf8_text };
+		bool threw = false;
+		try
+		{
+			s.erase(2, 1);
+		}
+		catch (const std::out_of_range&)
+		{
+			threw = true;
+		}
+		assert(threw);
+	}
+	{
+		utf8_string s{ utf8_text };
+		bool threw = false;
+		try
+		{
+			s.erase(1, 1);
+		}
+		catch (const std::out_of_range&)
+		{
+			threw = true;
+		}
+		assert(threw);
+	}
+	{
+		utf8_string s{ utf8_text };
+		bool threw = false;
+		try
+		{
+			s.replace(decltype(s)::npos, 1, "Ω"_utf8_sv);
+		}
+		catch (const std::out_of_range&)
+		{
+			threw = true;
+		}
+		assert(threw);
+	}
+	{
+		utf8_string s{ utf8_text };
+		bool threw = false;
+		try
+		{
+			s.replace(2, 1, "Ω"_utf8_sv);
+		}
+		catch (const std::out_of_range&)
+		{
+			threw = true;
+		}
+		assert(threw);
+	}
+	{
+		utf8_string s{ utf8_text };
+		bool threw = false;
+		try
+		{
+			s.replace(1, 1, "Ω"_utf8_sv);
+		}
+		catch (const std::out_of_range&)
+		{
+			threw = true;
+		}
+		assert(threw);
+	}
+	{
+		utf8_string s{ utf8_text };
+		bool threw = false;
+		try
+		{
+			s.replace(s.size(), "Ω"_utf8_sv);
+		}
+		catch (const std::out_of_range&)
+		{
+			threw = true;
+		}
+		assert(threw);
+	}
+	{
+		utf8_string s{ utf8_text };
+		bool threw = false;
+		try
+		{
+			s.replace(2, "Ω"_u8c);
+		}
+		catch (const std::out_of_range&)
+		{
+			threw = true;
+		}
+		assert(threw);
+	}
+	{
+		utf8_string s{ utf8_text };
+		bool threw = false;
+		try
+		{
+			s.replace_with_range(decltype(s)::npos, 1, std::array{ "Ω"_u8c });
+		}
+		catch (const std::out_of_range&)
+		{
+			threw = true;
+		}
+		assert(threw);
+	}
+	{
+		utf8_string s{ utf8_text };
+		bool threw = false;
+		try
+		{
+			s.replace_with_range(2, std::array{ "Ω"_u8c });
+		}
+		catch (const std::out_of_range&)
+		{
+			threw = true;
+		}
+		assert(threw);
+	}
 
 	assert(std::format("{}", utf8_text) == "A\xC3\xA9\xE2\x82\xAC");
-	assert(std::hash<utf8_string_view>{}(utf8_text) == std::hash<utf8_string_view>{}(u8"A\u00E9\u20AC"_utf8_sv));
+	assert(std::hash<utf8_string_view>{}(utf8_text) == std::hash<utf8_string_view>{}("Aé€"_utf8_sv));
 	{
 		std::ostringstream oss;
 		oss << utf8_text;
@@ -204,3 +376,5 @@ inline void run_utf8_ranges_tests()
 		assert(decoded == "A\xEF\xBF\xBD\xEF\xBF\xBD(\xEF\xBF\xBD");
 	}
 }
+
+#endif // UTF8_RANGES_TESTS_HPP

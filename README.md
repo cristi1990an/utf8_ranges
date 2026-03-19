@@ -868,13 +868,12 @@ Complexity:
 
 ```cpp
 constexpr std::optional<utf8_char> char_at(size_type index) const noexcept;
+constexpr utf8_char char_at_unchecked(size_type index) const noexcept;
 ```
 
-Returns the character at zero-based character index `index`.
+Returns the character beginning at byte index `index`.
 
-If `index` is out of range, returns `std::nullopt`.
-
-This function operates on character indices, not byte offsets.
+Returns `std::nullopt` if `index` is out of range or does not name a UTF-8 character boundary.
 
 Preconditions:
 
@@ -882,7 +881,24 @@ Preconditions:
 
 Complexity:
 
-- Linear in `index`, and linear in the number of characters in the worst case
+- Constant
+
+#### `char_at_unchecked`
+
+```cpp
+constexpr utf8_char char_at_unchecked(size_type index) const noexcept;
+```
+
+Returns the character beginning at byte index `index` without checking that `index` is in range or lies on a UTF-8 character boundary.
+
+Preconditions:
+
+- `index < size()`
+- `index` is a UTF-8 character boundary
+
+Complexity:
+
+- Constant
 
 #### `substr`
 
@@ -1097,8 +1113,24 @@ public:
 
     constexpr void shrink_to_fit();
     constexpr std::size_t capacity() const;
+    constexpr Allocator get_allocator() const noexcept;
     constexpr std::size_t size() const;
     constexpr void pop_back();
+    constexpr utf8_string& erase(std::size_t index,
+                                 std::size_t count = npos);
+    constexpr utf8_string& replace(std::size_t pos, std::size_t count,
+                                   utf8_string_view other);
+    constexpr utf8_string& replace(std::size_t pos, std::size_t count,
+                                   utf8_char other);
+    constexpr utf8_string& replace(std::size_t pos,
+                                   utf8_string_view other);
+    constexpr utf8_string& replace(std::size_t pos,
+                                   utf8_char other);
+    constexpr utf8_string& replace_with_range(std::size_t pos,
+                                              std::size_t count,
+                                              R&& rg);
+    constexpr utf8_string& replace_with_range(std::size_t pos,
+                                              R&& rg);
     constexpr void reserve(std::size_t new_cap);
     constexpr auto base() const& noexcept;
     constexpr auto base() && noexcept;
@@ -1153,9 +1185,90 @@ Remarks:
 
 - Calling `pop_back()` on an empty string is undefined behavior
 
+#### `erase(std::size_t index, std::size_t count = npos)`
+
+Erases the byte range beginning at `index` and extending for at most `count` bytes, clamped to the end of the string.
+
+The erased range must define a valid UTF-8 substring. In practice this means:
+
+- `index <= size()`
+- `index` must be a UTF-8 character boundary
+- `index + min(count, size() - index)` must also be a UTF-8 character boundary
+
+Throws:
+
+- `std::out_of_range` if `index` is greater than `size()`
+- `std::out_of_range` if the requested erased range does not align to UTF-8 character boundaries
+
+#### `replace(std::size_t pos, std::size_t count, utf8_string_view other)`
+
+Replaces the byte range beginning at `pos` and extending for at most `count` bytes, clamped to the end of the string, with `other`.
+
+The replaced range must define a valid UTF-8 substring. In practice this means:
+
+- `pos <= size()`
+- `pos` must be a UTF-8 character boundary
+- `pos + min(count, size() - pos)` must also be a UTF-8 character boundary
+
+Throws:
+
+- `std::out_of_range` if `pos` is greater than `size()`
+- `std::out_of_range` if the requested replaced range does not align to UTF-8 character boundaries
+
+#### `replace(std::size_t pos, std::size_t count, utf8_char other)`
+
+Equivalent to replacing the validated UTF-8 substring with the UTF-8 encoding of `other`.
+
+Throws:
+
+- `std::out_of_range` under the same conditions as `replace(pos, count, utf8_string_view)`
+
+#### `replace(std::size_t pos, utf8_string_view other)`
+
+Replaces the single UTF-8 character beginning at byte index `pos` with `other`.
+
+Throws:
+
+- `std::out_of_range` if `pos` is out of range
+- `std::out_of_range` if `pos` is not a UTF-8 character boundary
+
+#### `replace(std::size_t pos, utf8_char other)`
+
+Replaces the single UTF-8 character beginning at byte index `pos` with `other`.
+
+Throws:
+
+- `std::out_of_range` if `pos` is out of range
+- `std::out_of_range` if `pos` is not a UTF-8 character boundary
+
+#### `replace_with_range(std::size_t pos, std::size_t count, R&& rg)`
+
+Replaces the byte range beginning at `pos` and extending for at most `count` bytes, clamped to the end of the string, with the UTF-8 encoding of the `utf8_char` range `rg`.
+
+The replaced range must define a valid UTF-8 substring. In practice this means:
+
+- `pos <= size()`
+- `pos` must be a UTF-8 character boundary
+- `pos + min(count, size() - pos)` must also be a UTF-8 character boundary
+
+Throws:
+
+- `std::out_of_range` if `pos` is greater than `size()`
+- `std::out_of_range` if the requested replaced range does not align to UTF-8 character boundaries
+
+#### `replace_with_range(std::size_t pos, R&& rg)`
+
+Replaces the single UTF-8 character beginning at byte index `pos` with the UTF-8 encoding of the `utf8_char` range `rg`.
+
+Throws:
+
+- `std::out_of_range` if `pos` is out of range
+- `std::out_of_range` if `pos` is not a UTF-8 character boundary
+
 ### Observers and conversions
 
 - `base()` exposes the underlying `std::basic_string<char8_t, ...>`
+- `get_allocator()` returns the stored allocator
 - `as_view()` returns an unchecked `utf8_string_view`
 - `operator utf8_string_view()` converts to a view
 - `data()` and `c_str()` expose the contiguous byte storage
@@ -1168,8 +1281,12 @@ using namespace utf8_ranges::literals;
 
 utf8_string s{ "Aé€"_utf8_sv };
 s.push_back("!"_u8c);
+s.erase(1, 2); // removes "é"
+s.replace(1, "Ω"_u8c); // replaces '€' with 'Ω'
+s.replace_with_range(1, std::array{ "β"_u8c, "!"_u8c });
 
 assert(s.char_count() == 4);
+assert(s == "Aβ!!"_utf8_sv);
 assert(s.ends_with("!"_u8c));
 ```
 

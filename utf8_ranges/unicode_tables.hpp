@@ -1,4 +1,5 @@
-#pragma once
+#ifndef UTF8_RANGES_UNICODE_TABLES_HPP
+#define UTF8_RANGES_UNICODE_TABLES_HPP
 
 namespace utf8_ranges
 {
@@ -2352,3 +2353,5 @@ constexpr bool is_digit(std::uint32_t scalar) noexcept
 }
 
 }
+
+#endif // UTF8_RANGES_UNICODE_TABLES_HPP
