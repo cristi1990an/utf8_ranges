@@ -1,7 +1,7 @@
 #ifndef UTF8_RANGES_TESTS_HPP
 #define UTF8_RANGES_TESTS_HPP
 
-#include "utf8_ranges.hpp"
+#include "unicode_ranges.hpp"
 
 #include <array>
 #include <cassert>
@@ -52,6 +52,7 @@ inline void run_utf8_ranges_tests()
 	};
 	constexpr utf8_char latin1_ch = "é"_u8c;
 	constexpr auto utf8_text = "Aé€"_utf8_sv;
+	constexpr auto utf16_text = u"Aé😀"_utf16_sv;
 
 	static_assert("A"_u8c.ascii_lowercase() == "a"_u8c);
 	static_assert("z"_u8c.ascii_uppercase() == "Z"_u8c);
@@ -158,6 +159,61 @@ inline void run_utf8_ranges_tests()
 	static_assert(utf8_string_view::from_bytes("Aé€"_utf8_sv.as_view()).has_value());
 	static_assert(utf8_text == "Aé€"_utf8_sv);
 	static_assert(utf8_text < "Z"_utf8_sv);
+
+	static_assert(utf16_text.size() == 4);
+	static_assert(utf16_text == u"Aé😀"_utf16_sv);
+	static_assert(utf16_text.is_char_boundary(0));
+	static_assert(utf16_text.is_char_boundary(1));
+	static_assert(utf16_text.is_char_boundary(2));
+	static_assert(!utf16_text.is_char_boundary(3));
+	static_assert(utf16_text.ceil_char_boundary(0) == 0);
+	static_assert(utf16_text.ceil_char_boundary(3) == 4);
+	static_assert(utf16_text.ceil_char_boundary(utf16_string_view::npos) == utf16_text.size());
+	static_assert(utf16_text.floor_char_boundary(0) == 0);
+	static_assert(utf16_text.floor_char_boundary(3) == 2);
+	static_assert(utf16_text.floor_char_boundary(utf16_string_view::npos) == utf16_text.size());
+	static_assert(utf16_text.char_at(0).has_value());
+	static_assert(utf16_text.char_at(0).value() == u"A"_u16c);
+	static_assert(utf16_text.char_at(2).has_value());
+	static_assert(utf16_text.char_at(2).value() == u"😀"_u16c);
+	static_assert(!utf16_text.char_at(3).has_value());
+	static_assert(!utf16_text.char_at(utf16_text.size()).has_value());
+	static_assert(utf16_text.char_at_unchecked(1) == u"é"_u16c);
+	static_assert(utf16_text.find(static_cast<char16_t>(u'A')) == 0);
+	static_assert(utf16_text.find(static_cast<char16_t>(0xDE00u), 3) == 3);
+	static_assert(utf16_text.find(static_cast<char16_t>(u'A'), utf16_string_view::npos) == utf16_string_view::npos);
+	static_assert(utf16_text.find(u"é😀"_utf16_sv) == 1);
+	static_assert(utf16_text.find(u"é😀"_utf16_sv, 2) == utf16_string_view::npos);
+	static_assert(utf16_text.find(u"😀"_utf16_sv, 3) == utf16_string_view::npos);
+	static_assert(utf16_text.find(u"é"_u16c, 2) == utf16_string_view::npos);
+	static_assert(utf16_text.find(u"😀"_u16c, 3) == utf16_string_view::npos);
+	static_assert(utf16_text.find(u"é"_u16c) == 1);
+	static_assert(utf16_text.find(u"😀"_u16c) == 2);
+	static_assert(utf16_text.find(u"Z"_u16c) == utf16_string_view::npos);
+	static_assert(utf16_text.rfind(static_cast<char16_t>(u'A')) == 0);
+	static_assert(utf16_text.rfind(static_cast<char16_t>(0xDE00u), 3) == 3);
+	static_assert(utf16_text.rfind(u"é😀"_utf16_sv) == 1);
+	static_assert(utf16_text.rfind(u"é😀"_utf16_sv, 2) == 1);
+	static_assert(utf16_text.rfind(u"😀"_utf16_sv, 1) == utf16_string_view::npos);
+	static_assert(utf16_text.rfind(u"é"_u16c, 2) == 1);
+	static_assert(utf16_text.rfind(u"😀"_u16c, 1) == utf16_string_view::npos);
+	static_assert(utf16_text.rfind(u"😀"_u16c) == 2);
+	static_assert(utf16_text.rfind(u"Z"_u16c) == utf16_string_view::npos);
+	static_assert(utf16_text.substr(1).has_value());
+	static_assert(utf16_text.substr(1).value() == u"é😀"_utf16_sv);
+	static_assert(utf16_text.substr(2, 2).value() == u"😀"_utf16_sv);
+	static_assert(!utf16_text.substr(3, 1).has_value());
+	static_assert(utf16_text.starts_with(static_cast<char16_t>(u'A')));
+	static_assert(utf16_text.starts_with(u"A"_u16c));
+	static_assert(utf16_text.starts_with(u"A"_utf16_sv));
+	static_assert(!utf16_text.starts_with(u"é"_u16c));
+	static_assert(!utf16_text.ends_with(static_cast<char16_t>(u'A')));
+	static_assert(utf16_text.ends_with(u"😀"_u16c));
+	static_assert(utf16_text.ends_with(u"😀"_utf16_sv));
+	static_assert(!utf16_text.ends_with(u"é"_u16c));
+	static_assert(utf16_string_view::from_code_units(u"Aé😀"_utf16_sv.as_view()).has_value());
+	static_assert(utf16_text == u"Aé😀"_utf16_sv);
+	static_assert(utf16_text < u"Z"_utf16_sv);
 
 	static_assert([] {
 		utf8_char ch = utf8_char::from_scalar_unchecked(0x7Fu);
@@ -327,6 +383,13 @@ inline void run_utf8_ranges_tests()
 		}
 		assert(decoded == "\xF0\x9F\x98\x80\xC3\xA9" "A");
 	}
+	{
+		const std::array<char16_t, 1> invalid{ static_cast<char16_t>(0xD800u) };
+		const auto result = utf16_string_view::from_code_units({ invalid.data(), invalid.size() });
+		assert(!result.has_value());
+		assert(result.error().code == utf16_error_code::truncated_surrogate_pair);
+		assert(result.error().first_invalid_code_unit_index == 0);
+	}
 
 	assert(std::format("{:d}", "A"_u8c) == "65");
 	assert(std::format("{:x}", latin1_ch) == "e9");
@@ -344,6 +407,7 @@ inline void run_utf8_ranges_tests()
 	assert(std::format("{:_<6s}", utf8_text.reversed_chars() | std::ranges::to<utf8_string>()) == "\xE2\x82\xAC" "\xC3\xA9" "A___");
 
 	assert(utf8_string{}.base().empty());
+	static_assert(std::same_as<utf8_string::value_type, utf8_char>);
 	static_assert(std::same_as<decltype(utf8_string{}.get_allocator()), std::allocator<char8_t>>);
 	assert("Aé€"_utf8_s == utf8_text);
 	assert(utf8_string{ utf8_text } == "Aé€"_utf8_s);
@@ -367,6 +431,99 @@ inline void run_utf8_ranges_tests()
 	{
 		const auto reversed = utf8_text.reversed_chars() | std::ranges::to<utf8_string>();
 		assert(reversed == "€éA"_utf8_sv);
+	}
+	assert(utf16_string{}.base().empty());
+	static_assert(std::same_as<utf16_string::value_type, utf16_char>);
+	static_assert(std::same_as<decltype(utf16_string{}.get_allocator()), std::allocator<char16_t>>);
+	assert(u"Aé😀"_utf16_s == utf16_text);
+	assert(utf16_string{ utf16_text } == u"Aé😀"_utf16_s);
+	assert(std::format("{}", utf16_string{ utf16_text }) == "A\xC3\xA9\xF0\x9F\x98\x80");
+	{
+		const auto e_acute = utf16_char::from_scalar_unchecked(0x00E9u);
+		const auto lhs = u"A"_utf16_s;
+		const utf16_string rhs(std::from_range, std::array{ e_acute });
+		const utf16_string expected(std::from_range, std::array{ u"A"_u16c, e_acute });
+
+		assert(lhs + rhs == expected);
+		assert(rhs + lhs == utf16_string(std::from_range, std::array{ e_acute, u"A"_u16c }));
+		assert(lhs + e_acute == expected);
+		assert(e_acute + lhs == utf16_string(std::from_range, std::array{ e_acute, u"A"_u16c }));
+		auto moved_lhs = u"A"_utf16_s;
+		assert(std::move(moved_lhs) + rhs == expected);
+
+		auto moved_rhs = u"A"_utf16_s;
+		assert(rhs + std::move(moved_rhs) == utf16_string(std::from_range, std::array{ e_acute, u"A"_u16c }));
+	}
+	{
+		utf16_string s;
+		s.assign(u"Aé😀"_utf16_sv);
+		assert(s == u"Aé😀"_utf16_sv);
+	}
+	{
+		utf16_string s;
+		s.assign(u"Ω"_u16c);
+		assert(s == u"Ω"_utf16_sv);
+	}
+	{
+		auto s = u"Aé😀"_utf16_s;
+		s.assign(3, u"!"_u16c);
+		assert(s == u"!!!"_utf16_sv);
+	}
+	{
+		auto s = u"Aé😀"_utf16_s;
+		s.assign_range(std::array{ u"Ω"_u16c, u"!"_u16c });
+		assert(s == u"Ω!"_utf16_sv);
+	}
+	{
+		auto s = u"Aé😀"_utf16_s;
+		const std::array data{ u"β"_u16c, u"γ"_u16c };
+		s.assign(data.begin(), data.end());
+		assert(s == u"βγ"_utf16_sv);
+	}
+	{
+		auto s = u"Aé😀"_utf16_s;
+		s.assign({ u"x"_u16c, u"y"_u16c, u"z"_u16c });
+		assert(s == u"xyz"_utf16_sv);
+	}
+	{
+		auto s = u"Aé😀"_utf16_s;
+		s.erase(1, 1);
+		assert(s == u"A😀"_utf16_sv);
+	}
+	{
+		auto s = u"Aé😀"_utf16_s;
+		s.erase(2);
+		assert(s == u"Aé"_utf16_sv);
+	}
+	{
+		auto s = u"Aé😀"_utf16_s;
+		s.replace(1, 1, u"Ω"_utf16_sv);
+		assert(s == u"AΩ😀"_utf16_sv);
+	}
+	{
+		auto s = u"Aé😀"_utf16_s;
+		s.replace(1, 1, u"Ω"_u16c);
+		assert(s == u"AΩ😀"_utf16_sv);
+	}
+	{
+		auto s = u"Aé😀"_utf16_s;
+		s.replace(1, u"XYZ"_utf16_sv);
+		assert(s == u"AXYZ😀"_utf16_sv);
+	}
+	{
+		auto s = u"Aé😀"_utf16_s;
+		s.replace(1, u"Ω"_u16c);
+		assert(s == u"AΩ😀"_utf16_sv);
+	}
+	{
+		auto s = u"Aé😀"_utf16_s;
+		s.replace_with_range(1, 1, std::array{ u"Ω"_u16c, u"!"_u16c });
+		assert(s == u"AΩ!😀"_utf16_sv);
+	}
+	{
+		auto s = u"Aé😀"_utf16_s;
+		s.replace_with_range(1, std::array{ u"Ω"_u16c, u"!"_u16c });
+		assert(s == u"AΩ!😀"_utf16_sv);
 	}
 	{
 		utf8_string s;
@@ -516,11 +673,18 @@ inline void run_utf8_ranges_tests()
 	}
 
 	assert(std::format("{}", utf8_text) == "A\xC3\xA9\xE2\x82\xAC");
+	assert(std::format("{}", utf16_text) == "A\xC3\xA9\xF0\x9F\x98\x80");
 	assert(std::hash<utf8_string_view>{}(utf8_text) == std::hash<utf8_string_view>{}("Aé€"_utf8_sv));
+	assert(std::hash<utf16_string_view>{}(utf16_text) == std::hash<utf16_string_view>{}(u"Aé😀"_utf16_sv));
 	{
 		std::ostringstream oss;
 		oss << utf8_text;
 		assert(oss.str() == "A\xC3\xA9\xE2\x82\xAC");
+	}
+	{
+		std::ostringstream oss;
+		oss << utf16_text;
+		assert(oss.str() == "A\xC3\xA9\xF0\x9F\x98\x80");
 	}
 	{
 		std::ostringstream oss;

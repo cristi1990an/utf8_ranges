@@ -36,6 +36,9 @@
     <ClInclude Include="utf8_ranges.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="unicode_ranges.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="utf8_ranges\utf16_views.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>

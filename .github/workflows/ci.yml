@@ -27,10 +27,10 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Build
-        run: msbuild utf8_ranges.vcxproj /p:Configuration=${{ matrix.configuration }} /p:Platform=x64 /p:PlatformToolset=v143 /p:TreatWarningAsError=true
+        run: msbuild unicode_ranges.vcxproj /p:Configuration=${{ matrix.configuration }} /p:Platform=x64 /p:PlatformToolset=v143 /p:TreatWarningAsError=true
 
       - name: Run tests
-        run: .\x64\${{ matrix.configuration }}\utf8_ranges.exe
+        run: .\x64\${{ matrix.configuration }}\unicode_ranges.exe
 
   clang-cl:
     name: Clang-cl (${{ matrix.configuration }}, C++23)
@@ -50,10 +50,10 @@ jobs:
         uses: microsoft/setup-msbuild@v2
 
       - name: Build
-        run: msbuild utf8_ranges.vcxproj /p:Configuration=${{ matrix.configuration }} /p:Platform=x64 /p:PlatformToolset=ClangCL /p:TreatWarningAsError=true
+        run: msbuild unicode_ranges.vcxproj /p:Configuration=${{ matrix.configuration }} /p:Platform=x64 /p:PlatformToolset=ClangCL /p:TreatWarningAsError=true
 
       - name: Run tests
-        run: .\x64\${{ matrix.configuration }}\utf8_ranges.exe
+        run: .\x64\${{ matrix.configuration }}\unicode_ranges.exe
 
   linux:
     name: ${{ matrix.name }} (${{ matrix.opt_name }}${{ matrix.sanitizer_name }}, C++23)
@@ -68,7 +68,7 @@ jobs:
             packages: g++-14
             cxx: g++-14
             cxxflags: ""
-            output: utf8_ranges_gcc_o0
+            output: unicode_ranges_gcc_o0
             opt_name: O0
             opt_flags: "-O0"
             sanitizer_name: ""
@@ -80,7 +80,7 @@ jobs:
             packages: g++-14
             cxx: g++-14
             cxxflags: ""
-            output: utf8_ranges_gcc_o2
+            output: unicode_ranges_gcc_o2
             opt_name: O2
             opt_flags: "-O2"
             sanitizer_name: ""
@@ -92,7 +92,7 @@ jobs:
             packages: g++-14
             cxx: g++-14
             cxxflags: ""
-            output: utf8_ranges_gcc_o3
+            output: unicode_ranges_gcc_o3
             opt_name: O3
             opt_flags: "-O3"
             sanitizer_name: ""
@@ -104,7 +104,7 @@ jobs:
             packages: g++-14
             cxx: g++-14
             cxxflags: ""
-            output: utf8_ranges_gcc_o0_san
+            output: unicode_ranges_gcc_o0_san
             opt_name: O0
             opt_flags: "-O0"
             sanitizer_name: ", ASan+UBSan"
@@ -116,7 +116,7 @@ jobs:
             packages: g++-14
             cxx: g++-14
             cxxflags: ""
-            output: utf8_ranges_gcc_o2_san
+            output: unicode_ranges_gcc_o2_san
             opt_name: O2
             opt_flags: "-O2"
             sanitizer_name: ", ASan+UBSan"
@@ -128,7 +128,7 @@ jobs:
             packages: g++-14
             cxx: g++-14
             cxxflags: ""
-            output: utf8_ranges_gcc_o3_san
+            output: unicode_ranges_gcc_o3_san
             opt_name: O3
             opt_flags: "-O3"
             sanitizer_name: ", ASan+UBSan"
@@ -140,7 +140,7 @@ jobs:
             packages: clang-22 libc++-22-dev libc++abi-22-dev
             cxx: clang++-22
             cxxflags: "-stdlib=libc++"
-            output: utf8_ranges_clang_o0
+            output: unicode_ranges_clang_o0
             opt_name: O0
             opt_flags: "-O0"
             sanitizer_name: ""
@@ -152,7 +152,7 @@ jobs:
             packages: clang-22 libc++-22-dev libc++abi-22-dev
             cxx: clang++-22
             cxxflags: "-stdlib=libc++"
-            output: utf8_ranges_clang_o2
+            output: unicode_ranges_clang_o2
             opt_name: O2
             opt_flags: "-O2"
             sanitizer_name: ""
@@ -164,7 +164,7 @@ jobs:
             packages: clang-22 libc++-22-dev libc++abi-22-dev
             cxx: clang++-22
             cxxflags: "-stdlib=libc++"
-            output: utf8_ranges_clang_o0_san
+            output: unicode_ranges_clang_o0_san
             opt_name: O0
             opt_flags: "-O0"
             sanitizer_name: ", ASan+UBSan"
@@ -176,7 +176,7 @@ jobs:
             packages: clang-22 libc++-22-dev libc++abi-22-dev
             cxx: clang++-22
             cxxflags: "-stdlib=libc++"
-            output: utf8_ranges_clang_o2_san
+            output: unicode_ranges_clang_o2_san
             opt_name: O2
             opt_flags: "-O2"
             sanitizer_name: ", ASan+UBSan"

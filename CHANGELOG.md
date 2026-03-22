@@ -32,11 +32,17 @@ tracking local work before it is tagged or versioned.
 - `utf8_ranges::views::lossy_utf16`
 - `utf8_ranges::views::utf16_view`
 - `utf8_ranges::views::reversed_utf16_view`
+- `utf16_string_view`
+- `operator ""_utf16_sv`
+- `utf16_string`
+- `operator ""_utf16_s`
 - `std::formatter<utf8_char, wchar_t>`
 - `std::formatter<utf16_char, wchar_t>`
 
 ### Changed
 
+- the public umbrella header is now `unicode_ranges.hpp`, with `utf8_ranges.hpp` retained as a compatibility shim
+- the Visual Studio project files are now named `unicode_ranges.*`
 - `utf8_char::byte_count()` has been renamed to `code_unit_count()`
 - `utf8_string_view::char_at(index)` now interprets `index` as a byte index and returns `std::nullopt` when the index is out of range or not a UTF-8 character boundary
 - `utf8_string` is now an alias for `basic_utf8_string<>`, which lets `std::ranges::to<utf8_string>()` work naturally
@@ -48,5 +54,6 @@ tracking local work before it is tagged or versioned.
 ### Documentation
 
 - expanded the `utf8_string_view` reference for `char_at` and `char_at_unchecked`
+- added documentation for `utf16_string_view`, `utf16_string`, `_utf16_sv`, and `_utf16_s`
 - documented the `utf8_string` mutation APIs, including `assign`, `insert`, `erase`, `replace`, `replace_with_range`, `operator+`, and `get_allocator`
-- added documentation for `utf16_char`, `utf16_view`, `reversed_utf16_view`, `lossy_utf16_view`, the `_utf8_s` literal, and the new UTF-8 string header layout
+- added documentation for `utf16_char`, `utf16_view`, `reversed_utf16_view`, `lossy_utf16_view`, and the `_utf8_s` literal

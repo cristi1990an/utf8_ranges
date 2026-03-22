@@ -1,15 +1,17 @@
-﻿# utf8_ranges (work in progress)
+# unicode_ranges (work in progress)
 
-`utf8_ranges` is a header-only C++ library for representing, validating, iterating, and formatting UTF-8 text in C++.
+`unicode_ranges` is a header-only C++ library for representing, validating, iterating, and formatting UTF-8 and UTF-16 text in C++.
 
-The library currently focuses on UTF-8 text, with a small UTF-16-native layer that is meant to grow over time.
+It provides validated UTF-8 and UTF-16 character, view, string, and range abstractions for modern C++.
 
 The current public building blocks are:
 
 - `utf8_char`: one Unicode scalar value stored as its encoded UTF-8 byte sequence, guaranteed to represent a valid UTF-8 character
 - `utf16_char`: one Unicode scalar value stored as its encoded UTF-16 code units, guaranteed to represent a valid UTF-16 character
 - `utf8_string_view`: borrowed UTF-8 byte view, similar to `std::string_view` but guaranteed to represent a valid UTF-8 string slice
+- `utf16_string_view`: borrowed UTF-16 code-unit view, similar to `std::u16string_view` but guaranteed to represent a valid UTF-16 string slice
 - `utf8_string`: an owning UTF-8 string, similar to `std::string` but guaranteed to store valid UTF-8
+- `utf16_string`: an owning UTF-16 string, similar to `std::u16string` but guaranteed to store valid UTF-16
 - `utf8_ranges::views::utf8_view`: lazy iteration over valid UTF-8
 - `utf8_ranges::views::utf16_view`: lazy iteration over valid UTF-16
 - `utf8_ranges::views::reversed_utf8_view`: lazy reverse-order iteration over valid UTF-8
@@ -20,7 +22,7 @@ The current public building blocks are:
 The public entry point is:
 
 ```cpp
-#include "utf8_ranges.hpp"
+#include "unicode_ranges.hpp"
 ```
 
 All public library types and functions live in namespace `utf8_ranges`.
@@ -39,11 +41,13 @@ The nested namespace `utf8_ranges::details` contains implementation details only
 6. [Reference: utf8_char](#reference-utf8_char)
 7. [Reference: utf16_char](#reference-utf16_char)
 8. [Reference: utf8_string_view](#reference-utf8_string_view)
-9. [Reference: utf8_string](#reference-utf8_string)
-10. [Reference: views](#reference-views)
-11. [Reference: literals](#reference-literals)
-12. [Reference: formatting, streaming, hashing](#reference-formatting-streaming-hashing)
-13. [Semantics notes](#semantics-notes)
+9. [Reference: utf16_string_view](#reference-utf16_string_view)
+10. [Reference: utf16_string](#reference-utf16_string)
+11. [Reference: utf8_string](#reference-utf8_string)
+12. [Reference: views](#reference-views)
+13. [Reference: literals](#reference-literals)
+14. [Reference: formatting, streaming, hashing](#reference-formatting-streaming-hashing)
+15. [Semantics notes](#semantics-notes)
 
 ## Goals
 
@@ -110,7 +114,7 @@ Suppose you have UTF-8 text such as `café €`, and you want to:
 - access the first and last character correctly
 
 ```cpp
-#include "utf8_ranges.hpp"
+#include "unicode_ranges.hpp"
 
 #include <algorithm>
 #include <array>
@@ -145,7 +149,7 @@ static_assert(text.find("€"_u8c) == 6);
 The library is also `constexpr`-friendly. UTF-8 literals and many operations may be evaluated at compile time:
 
 ```cpp
-#include "utf8_ranges.hpp"
+#include "unicode_ranges.hpp"
 
 using namespace utf8_ranges;
 using namespace utf8_ranges::literals;
@@ -174,7 +178,7 @@ static_assert(text.size() == 6);
 Printing and formatting are also supported for the library UTF-8 string types:
 
 ```cpp
-#include "utf8_ranges.hpp"
+#include "unicode_ranges.hpp"
 
 #include <cassert>
 #include <format>
@@ -233,6 +237,41 @@ std::expected<utf8_string_view, utf8_error> result = utf8_string_view::from_byte
 assert(!result.has_value());
 assert(result.error().code == utf8_error_code::invalid_sequence);
 assert(result.error().first_invalid_byte_index == 0);
+```
+
+UTF-16 validation reports:
+
+```cpp
+enum class utf16_error_code
+{
+    truncated_surrogate_pair,
+    invalid_sequence
+};
+
+struct utf16_error
+{
+    utf16_error_code code{};
+    std::size_t first_invalid_code_unit_index = 0;
+};
+```
+
+These are returned by checked construction APIs such as `utf16_string_view::from_code_units`.
+
+Example:
+
+```cpp
+using namespace utf8_ranges;
+
+const std::array<char16_t, 1> invalid_code_units{
+    static_cast<char16_t>(0xD800u)
+};
+
+std::expected<utf16_string_view, utf16_error> result = utf16_string_view::from_code_units(
+    { invalid_code_units.data(), invalid_code_units.size() });
+
+assert(!result.has_value());
+assert(result.error().code == utf16_error_code::truncated_surrogate_pair);
+assert(result.error().first_invalid_code_unit_index == 0);
 ```
 
 ## Reference: utf8_char
@@ -1373,6 +1412,201 @@ assert(!text.substr(2, 1).has_value());
 
 See [Reference: formatting, streaming, hashing](#reference-formatting-streaming-hashing).
 
+## Reference: utf16_string_view
+
+### Overview
+
+`utf16_string_view` is a validated borrowed UTF-16 code-unit sequence.
+
+It mirrors the public API of `utf8_string_view`, but all sizes, indices, and boundaries are expressed in UTF-16 code units rather than UTF-8 bytes.
+
+That means:
+
+- `size()` returns the number of UTF-16 code units
+- `char_count()` returns the number of Unicode scalar values
+- `find(char16_t, pos)` is a raw code-unit search
+- `find(utf16_char, pos)` and `find(utf16_string_view, pos)` round `pos` up to the next UTF-16 character boundary
+- `rfind(utf16_char, pos)` and `rfind(utf16_string_view, pos)` round `pos` down to a UTF-16 character boundary
+- `char_at(index)` returns `std::nullopt` if `index` is out of range or lies in the middle of a surrogate pair
+
+### Synopsis
+
+```cpp
+class utf16_string_view
+{
+public:
+    using size_type = std::size_t;
+    using difference_type = std::ptrdiff_t;
+    static constexpr size_type npos = static_cast<size_type>(-1);
+
+    utf16_string_view() = default;
+
+    static constexpr std::expected<utf16_string_view, utf16_error>
+        from_code_units(std::u16string_view code_units) noexcept;
+
+    static constexpr utf16_string_view
+        from_code_units_unchecked(std::u16string_view code_units) noexcept;
+
+    constexpr auto chars() const noexcept;
+    constexpr auto reversed_chars() const noexcept;
+    constexpr size_type size() const noexcept;
+    constexpr bool empty() const noexcept;
+    constexpr bool is_ascii() const noexcept;
+    constexpr auto char_indices() const noexcept;
+
+    constexpr bool contains(utf16_char ch) const noexcept;
+    constexpr bool contains(utf16_string_view sv) const noexcept;
+
+    constexpr size_type find(char16_t ch, size_type pos = 0) const noexcept;
+    constexpr size_type find(utf16_char ch, size_type pos = 0) const noexcept;
+    constexpr size_type find(utf16_string_view sv, size_type pos = 0) const noexcept;
+
+    constexpr size_type rfind(char16_t ch, size_type pos = npos) const noexcept;
+    constexpr size_type rfind(utf16_char ch, size_type pos = npos) const noexcept;
+    constexpr size_type rfind(utf16_string_view sv, size_type pos = npos) const noexcept;
+
+    constexpr bool is_char_boundary(size_type index) const noexcept;
+    constexpr size_type char_count() const noexcept;
+    constexpr std::pair<utf16_string_view, utf16_string_view> split(size_type delim) const;
+    constexpr std::optional<utf16_char> char_at(size_type index) const noexcept;
+    constexpr utf16_char char_at_unchecked(size_type index) const noexcept;
+    constexpr std::optional<utf16_string_view> substr(size_type pos, size_type count = npos) const noexcept;
+    constexpr utf16_char front() const noexcept;
+    constexpr utf16_char back() const noexcept;
+    constexpr bool starts_with(char16_t ch) const noexcept;
+    constexpr bool starts_with(utf16_char ch) const noexcept;
+    constexpr bool starts_with(utf16_string_view sv) const noexcept;
+    constexpr bool ends_with(char16_t ch) const noexcept;
+    constexpr bool ends_with(utf16_char ch) const noexcept;
+    constexpr bool ends_with(utf16_string_view sv) const noexcept;
+    constexpr size_type ceil_char_boundary(size_type pos) const noexcept;
+    constexpr size_type floor_char_boundary(size_type pos) const noexcept;
+
+    constexpr auto base() const noexcept;
+    constexpr std::u16string_view as_view() const noexcept;
+    constexpr operator std::u16string_view() const noexcept;
+};
+```
+
+### Construction
+
+Use `from_code_units(...)` when the source may be arbitrary UTF-16 and `from_code_units_unchecked(...)` only when validity is already guaranteed.
+
+For compile-time construction from UTF-16 source text, prefer the `_utf16_sv` literal:
+
+```cpp
+constexpr auto text = u"Aé😀"_utf16_sv;
+static_assert(text.size() == 4);
+static_assert(text.char_count() == 3);
+```
+
+### Iteration and search
+
+`chars()` yields `utf16_char` values in forward order.
+
+`reversed_chars()` yields the same `utf16_char` values in reverse order.
+
+`find` and `rfind` behave like the UTF-8 variants, but with UTF-16 code-unit indexing and surrogate-pair boundaries.
+
+Example:
+
+```cpp
+constexpr auto text = u"Aé😀"_utf16_sv;
+
+static_assert(text.find(u"é"_u16c) == 1);
+static_assert(text.find(u"😀"_u16c) == 2);
+static_assert(text.rfind(u"😀"_u16c) == 2);
+static_assert(text.ceil_char_boundary(3) == 4);
+static_assert(text.floor_char_boundary(3) == 2);
+```
+
+### Substrings and boundaries
+
+Like `utf8_string_view`, substring operations are boundary-checked.
+
+Example:
+
+```cpp
+constexpr auto text = u"Aé😀"_utf16_sv;
+
+static_assert(text.char_at(2).value() == u"😀"_u16c);
+static_assert(!text.char_at(3).has_value());
+static_assert(text.substr(1).value() == u"é😀"_utf16_sv);
+static_assert(!text.substr(3, 1).has_value());
+```
+
+### Comparison
+
+`utf16_string_view` compares lexicographically by the underlying UTF-16 code units.
+
+### Formatting, streaming, hashing
+
+See [Reference: formatting, streaming, hashing](#reference-formatting-streaming-hashing).
+
+## Reference: utf16_string
+
+### Overview
+
+`utf16_string` owns UTF-16 text.
+
+It is allocator-aware and is backed by:
+
+```cpp
+std::basic_string<char16_t, std::char_traits<char16_t>, Allocator>
+```
+
+It shares the same read-only API as `utf16_string_view`.
+
+`utf16_string` also compares lexicographically by the underlying UTF-16 code units, and it can be compared directly with `utf16_string_view`.
+
+The owning API mirrors `utf8_string`, but all sizes and mutation ranges are expressed in UTF-16 code units.
+
+### Construction and literals
+
+Use:
+
+- `utf16_string_view` when you want a borrowed validated view
+- `utf16_string` when you want ownership
+
+The `_utf16_s` literal constructs an owning UTF-16 string:
+
+```cpp
+using namespace utf8_ranges;
+using namespace utf8_ranges::literals;
+
+const auto owned = u"Aé😀"_utf16_s;
+```
+
+### Mutation APIs
+
+The owning UTF-16 string supports the same mutation family as `utf8_string`:
+
+- `append`, `append_range`
+- `assign`, `assign_range`
+- `insert`, `insert_range`
+- `erase`
+- `replace`
+- `replace_with_range`
+- `push_back`
+- `operator+`
+
+All positions and lengths are UTF-16 code-unit indices, and operations that take boundaries throw `std::out_of_range` when asked to split a surrogate pair.
+
+Example:
+
+```cpp
+auto s = u"Aé😀"_utf16_s;
+s.replace(1, 1, u"Ω"_utf16_sv);
+assert(s == u"AΩ😀"_utf16_sv);
+
+s.replace_with_range(1, std::array{ u"β"_u16c, u"!"_u16c });
+assert(s == u"Aβ!😀"_utf16_sv);
+```
+
+### Formatting, streaming, hashing
+
+See [Reference: formatting, streaming, hashing](#reference-formatting-streaming-hashing).
+
 ## Reference: utf8_string
 
 ### Overview
@@ -1891,6 +2125,23 @@ constexpr auto a = "Aé€"_utf8_sv;
 constexpr auto b = "Aé€"_utf8_sv;
 ```
 
+### `operator ""_utf16_sv`
+
+Constructs a `utf16_string_view` from a UTF-16 string literal.
+
+Validation is performed at compile time.
+
+Examples:
+
+```cpp
+using namespace utf8_ranges;
+using namespace utf8_ranges::literals;
+
+constexpr auto text = u"Aé😀"_utf16_sv;
+static_assert(text.size() == 4);
+static_assert(text.char_count() == 3);
+```
+
 ### `operator ""_utf8_s`
 
 Constructs a `utf8_string` from a UTF-8 string literal.
@@ -1904,6 +2155,21 @@ using namespace utf8_ranges;
 using namespace utf8_ranges::literals;
 
 const auto owned = "Hello"_utf8_s;
+```
+
+### `operator ""_utf16_s`
+
+Constructs a `utf16_string` from a UTF-16 string literal.
+
+The literal contents are validated before the owning string is produced.
+
+Example:
+
+```cpp
+using namespace utf8_ranges;
+using namespace utf8_ranges::literals;
+
+const auto owned = u"Hello"_utf16_s;
 ```
 
 ## Reference: formatting, streaming, hashing
@@ -1969,13 +2235,54 @@ assert(std::format("{:>6}", text) == "   Aé€");
 assert(std::format("{:_<6}", text) == "Aé€___");
 ```
 
+### `utf16_string_view`
+
+Supported:
+
+- `std::ostream << utf16_string_view`
+- `std::hash<utf16_string_view>`
+- `std::formatter<utf16_string_view, char>`
+
+Formatting and narrow streaming encode the UTF-16 contents as UTF-8 text.
+
+Example:
+
+```cpp
+constexpr auto text = u"Aé😀"_utf16_sv;
+assert(std::format("{}", text) == "Aé😀");
+
+std::ostringstream oss;
+oss << text;
+assert(oss.str() == "Aé😀");
+```
+
+### `utf16_string`
+
+Supported:
+
+- `std::ostream << utf16_string`
+- `std::formatter<utf16_string, char>`
+
+Formatting and narrow streaming encode the UTF-16 contents as UTF-8 text.
+
+Example:
+
+```cpp
+const utf16_string text = u"Aé😀"_utf16_s;
+assert(std::format("{}", text) == "Aé😀");
+
+std::ostringstream oss;
+oss << text;
+assert(oss.str() == "Aé😀");
+```
+
 ## Semantics notes
 
-### 1. Byte-oriented versus character-oriented APIs
+### 1. Code-unit-oriented versus character-oriented APIs
 
 This is the most important rule when using the string types.
 
-Byte-oriented:
+Code-unit-oriented:
 
 - `size()`
 - `is_char_boundary()`
@@ -1995,11 +2302,13 @@ Character-oriented:
 Checked:
 
 - `utf8_string_view::from_bytes`
+- `utf16_string_view::from_code_units`
 - compile-time string and character literals
 
 Unchecked:
 
 - `utf8_string_view::from_bytes_unchecked`
+- `utf16_string_view::from_code_units_unchecked`
 - `views::utf8_view::from_bytes_unchecked`
 - `views::utf16_view::from_code_units_unchecked`
 - `views::reversed_utf8_view::from_bytes_unchecked`

@@ -22,7 +22,7 @@
     <VCProjectVersion>18.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{145ebcbd-1896-42ae-ad89-d25964826d92}</ProjectGuid>
-    <RootNamespace>utf8ranges</RootNamespace>
+    <RootNamespace>unicoderanges</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -150,8 +150,12 @@
     <ClInclude Include="utf8_ranges\unicode_tables.hpp" />
     <ClInclude Include="utf8_ranges_tests.hpp" />
     <ClInclude Include="utf8_ranges\utf16_char.hpp" />
+    <ClInclude Include="utf8_ranges\utf16_string_crtp.hpp" />
+    <ClInclude Include="utf8_ranges\utf16_string_view.hpp" />
+    <ClInclude Include="utf8_ranges\utf16_string.hpp" />
     <ClInclude Include="utf8_ranges\utf8_char.hpp" />
     <ClInclude Include="utf8_ranges.hpp" />
+    <ClInclude Include="unicode_ranges.hpp" />
     <ClInclude Include="utf8_ranges\utf16_views.hpp" />
     <ClInclude Include="utf8_ranges\utf8_views.hpp" />
   </ItemGroup>

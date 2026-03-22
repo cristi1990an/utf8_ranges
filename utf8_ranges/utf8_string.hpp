@@ -13,11 +13,11 @@ class basic_utf8_string : public details::utf8_string_crtp<basic_utf8_string<All
 	using equivalent_utf8_string_view = utf8_string_view;
 	using equivalent_string_view = std::u8string_view;
 
-public:
-	using allocator_type = Allocator;
-	using value_type = char8_t;
-	using size_type = std::size_t;
-	using difference_type = std::ptrdiff_t;
+ public:
+ 	using allocator_type = Allocator;
+ 	using value_type = utf8_char;
+ 	using size_type = std::size_t;
+ 	using difference_type = std::ptrdiff_t;
 	static constexpr size_type npos = static_cast<size_type>(-1);
 
 	static constexpr basic_utf8_string from_bytes_unchecked(base_type bytes) noexcept

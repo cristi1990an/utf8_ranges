@@ -29,12 +29,18 @@ namespace utf8_ranges
 {
 
 class utf8_string_view;
+class utf16_string_view;
 struct utf16_char;
 
 template <typename Allocator = std::allocator<char8_t>>
 class basic_utf8_string;
 
 using utf8_string = basic_utf8_string<>;
+
+template <typename Allocator = std::allocator<char16_t>>
+class basic_utf16_string;
+
+using utf16_string = basic_utf16_string<>;
 
 enum class utf8_error_code
 {
@@ -47,6 +53,18 @@ struct utf8_error
 {
 	utf8_error_code code{};
 	std::size_t first_invalid_byte_index = 0;
+};
+
+enum class utf16_error_code
+{
+	truncated_surrogate_pair,
+	invalid_sequence
+};
+
+struct utf16_error
+{
+	utf16_error_code code{};
+	std::size_t first_invalid_code_unit_index = 0;
 };
 
 namespace views
@@ -70,6 +88,9 @@ namespace details
 {
 	template <typename Derived, typename View = utf8_string_view>
 	class utf8_string_crtp;
+
+	template <typename Derived, typename View = utf16_string_view>
+	class utf16_string_crtp;
 
 	template<typename From, typename To>
 	concept non_narrowing_convertible =
@@ -245,6 +266,16 @@ namespace details
 		return false;
 	}
 
+	inline constexpr bool is_utf16_high_surrogate(std::uint16_t value) noexcept
+	{
+		return value >= 0xD800u && value <= 0xDBFFu;
+	}
+
+	inline constexpr bool is_utf16_low_surrogate(std::uint16_t value) noexcept
+	{
+		return value >= 0xDC00u && value <= 0xDFFFu;
+	}
+
 	template<typename CharT>
 	requires (std::is_integral_v<CharT>
 		&& !std::is_same_v<CharT, bool>
@@ -366,6 +397,50 @@ namespace details
 	}
 
 	template<typename CharT>
+	inline constexpr std::expected<void, utf16_error> validate_utf16(std::basic_string_view<CharT> value) noexcept
+	{
+		std::size_t index = 0;
+		while (index < value.size())
+		{
+			const auto first = static_cast<std::uint16_t>(value[index]);
+			if (!is_utf16_high_surrogate(first) && !is_utf16_low_surrogate(first)) [[likely]]
+			{
+				++index;
+				continue;
+			}
+
+			if (is_utf16_low_surrogate(first))
+			{
+				return std::unexpected(utf16_error{
+					.code = utf16_error_code::invalid_sequence,
+					.first_invalid_code_unit_index = index
+				});
+			}
+
+			if (index + 1 >= value.size()) [[unlikely]]
+			{
+				return std::unexpected(utf16_error{
+					.code = utf16_error_code::truncated_surrogate_pair,
+					.first_invalid_code_unit_index = index
+				});
+			}
+
+			const auto second = static_cast<std::uint16_t>(value[index + 1]);
+			if (!is_utf16_low_surrogate(second))
+			{
+				return std::unexpected(utf16_error{
+					.code = utf16_error_code::invalid_sequence,
+					.first_invalid_code_unit_index = index
+				});
+			}
+
+			index += 2;
+		}
+
+		return {};
+	}
+
+	template<typename CharT>
 	inline constexpr std::uint32_t decode_valid_utf8_char(std::basic_string_view<CharT> ch) noexcept
 	{
 		const auto byte = [&ch](std::size_t index) noexcept -> std::uint8_t
@@ -476,6 +551,27 @@ namespace details
 			}
 
 			consteval const CharT* data() const noexcept
+			{
+				return &p[0];
+			}
+		};
+
+		template<typename CharT, std::size_t N>
+		struct constexpr_utf16_string
+		{
+			char16_t p[N]{};
+
+			static constexpr std::size_t SIZE = N;
+
+			consteval constexpr_utf16_string(CharT const(&pp)[N])
+			{
+				for (std::size_t i = 0; i < N; ++i)
+				{
+					p[i] = static_cast<char16_t>(pp[i]);
+				}
+			}
+
+			consteval const char16_t* data() const noexcept
 			{
 				return &p[0];
 			}
