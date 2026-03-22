@@ -202,8 +202,11 @@ inline void run_utf8_ranges_tests()
 		assert((rhs.as_view() + lhs).as_view() == utf8_string(std::from_range, std::array{ e_acute, "A"_u8c }).as_view());
 		assert((lhs + e_acute).as_view() == expected.as_view());
 		assert((e_acute + lhs).as_view() == utf8_string(std::from_range, std::array{ e_acute, "A"_u8c }).as_view());
-		assert((std::move(utf8_string{ "A"_utf8_sv }) + rhs.as_view()).as_view() == expected.as_view());
-		assert((rhs.as_view() + std::move(utf8_string{ "A"_utf8_sv })).as_view() == utf8_string(std::from_range, std::array{ e_acute, "A"_u8c }).as_view());
+		auto moved_lhs = utf8_string{ "A"_utf8_sv };
+		assert((std::move(moved_lhs) + rhs.as_view()).as_view() == expected.as_view());
+
+		auto moved_rhs = utf8_string{ "A"_utf8_sv };
+		assert((rhs.as_view() + std::move(moved_rhs)).as_view() == utf8_string(std::from_range, std::array{ e_acute, "A"_u8c }).as_view());
 	}
 	{
 		const auto reversed = utf8_text.reversed_chars() | std::ranges::to<utf8_string>();
