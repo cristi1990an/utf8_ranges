@@ -137,6 +137,9 @@
   <ItemGroup>
     <ClInclude Include="utf8_ranges\core.hpp" />
     <ClInclude Include="utf8_ranges\string.hpp" />
+    <ClInclude Include="utf8_ranges\utf8_string_crtp.hpp" />
+    <ClInclude Include="utf8_ranges\utf8_string_view.hpp" />
+    <ClInclude Include="utf8_ranges\utf8_string.hpp" />
     <ClInclude Include="utf8_ranges\unicode_tables.hpp" />
     <ClInclude Include="utf8_ranges_tests.hpp" />
     <ClInclude Include="utf8_ranges\utf16_char.hpp" />

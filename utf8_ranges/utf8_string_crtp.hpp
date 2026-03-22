@@ -1,0 +1,430 @@
+#ifndef UTF8_RANGES_UTF8_STRING_CRTP_HPP
+#define UTF8_RANGES_UTF8_STRING_CRTP_HPP
+
+#include "utf8_views.hpp"
+
+namespace utf8_ranges
+{
+
+namespace details
+{
+
+template <typename Derived, typename View>
+class utf8_string_crtp
+{
+public:
+	using size_type = std::size_t;
+	using difference_type = std::ptrdiff_t;
+	static constexpr size_type npos = static_cast<size_type>(-1);
+
+	constexpr auto chars() const noexcept
+	{
+		return views::utf8_view::from_bytes_unchecked(byte_view());
+	}
+
+	constexpr auto reversed_chars() const noexcept
+	{
+		return views::reversed_utf8_view::from_bytes_unchecked(byte_view());
+	}
+
+	constexpr size_type size() const noexcept
+	{
+		return byte_view().size();
+	}
+
+	constexpr bool empty() const noexcept
+	{
+		return byte_view().empty();
+	}
+
+	constexpr bool is_ascii() const noexcept
+	{
+		return std::ranges::all_of(chars(), [](utf8_char ch) noexcept { return ch.is_ascii(); });
+	}
+
+	constexpr auto char_indices() const noexcept
+	{
+		return chars() | std::views::enumerate;
+	}
+
+	constexpr bool contains(utf8_char ch) const noexcept
+	{
+		return find(ch) != npos;
+	}
+
+	constexpr bool contains(View sv) const noexcept
+	{
+		return find(sv) != npos;
+	}
+
+	constexpr size_type find(char8_t ch, size_type pos = 0) const noexcept
+	{
+		pos = (std::min)(size(), pos);
+		if consteval
+		{
+			for (size_type index = pos; index != size(); ++index)
+			{
+				if (byte_view()[index] == ch)
+				{
+					return index;
+				}
+			}
+
+			return npos;
+		}
+		else
+		{
+			return byte_view().find(ch, pos);
+		}
+	}
+
+	constexpr size_type find(utf8_char ch, size_type pos = 0) const noexcept
+	{
+		pos = ceil_char_boundary((std::min)(size(), pos));
+		std::array<char8_t, 4> bytes{};
+		const auto needle_size = ch.encode_utf8<char8_t>(bytes.begin());
+		if consteval
+		{
+			if (needle_size > size() - pos)
+			{
+				return npos;
+			}
+
+			for (size_type index = pos; index + needle_size <= size(); ++index)
+			{
+				bool matches = true;
+				for (size_type needle_index = 0; needle_index != needle_size; ++needle_index)
+				{
+					if (byte_view()[index + needle_index] != bytes[needle_index])
+					{
+						matches = false;
+						break;
+					}
+				}
+
+				if (matches)
+				{
+					return index;
+				}
+			}
+
+			return npos;
+		}
+		else
+		{
+			return byte_view().find(std::u8string_view{ bytes.data(), needle_size }, pos);
+		}
+	}
+
+	constexpr size_type find(View sv, size_type pos = 0) const noexcept
+	{
+		pos = ceil_char_boundary((std::min)(size(), pos));
+		const auto needle = sv.base();
+		if (needle.empty())
+		{
+			return pos;
+		}
+
+		if consteval
+		{
+			if (needle.size() > size() - pos)
+			{
+				return npos;
+			}
+
+			for (size_type index = pos; index + needle.size() <= size(); ++index)
+			{
+				bool matches = true;
+				for (size_type needle_index = 0; needle_index != needle.size(); ++needle_index)
+				{
+					if (byte_view()[index + needle_index] != needle[needle_index])
+					{
+						matches = false;
+						break;
+					}
+				}
+
+				if (matches)
+				{
+					return index;
+				}
+			}
+
+			return npos;
+		}
+		else
+		{
+			return byte_view().find(needle, pos);
+		}
+	}
+
+	constexpr size_type rfind(char8_t ch, size_type pos = npos) const noexcept
+	{
+		if (empty())
+		{
+			return npos;
+		}
+
+		pos = (std::min)(size() - 1, pos);
+		if consteval
+		{
+			for (size_type index = pos + 1; index != 0;)
+			{
+				--index;
+				if (byte_view()[index] == ch)
+				{
+					return index;
+				}
+			}
+
+			return npos;
+		}
+		else
+		{
+			return byte_view().rfind(ch, pos);
+		}
+	}
+
+	constexpr size_type rfind(utf8_char ch, size_type pos = npos) const noexcept
+	{
+		std::array<char8_t, 4> bytes{};
+		const auto needle_size = ch.encode_utf8<char8_t>(bytes.begin());
+		if (needle_size > size())
+		{
+			return npos;
+		}
+
+		pos = floor_char_boundary((std::min)(size(), pos));
+		pos = floor_char_boundary((std::min)(pos, size() - needle_size));
+		if consteval
+		{
+			for (size_type index = pos + 1; index != 0;)
+			{
+				--index;
+				bool matches = true;
+				for (size_type needle_index = 0; needle_index != needle_size; ++needle_index)
+				{
+					if (byte_view()[index + needle_index] != bytes[needle_index])
+					{
+						matches = false;
+						break;
+					}
+				}
+
+				if (matches)
+				{
+					return index;
+				}
+			}
+
+			return npos;
+		}
+		else
+		{
+			return byte_view().rfind(std::u8string_view{ bytes.data(), needle_size }, pos);
+		}
+	}
+
+	constexpr size_type rfind(View sv, size_type pos = npos) const noexcept
+	{
+		const auto needle = sv.base();
+		pos = floor_char_boundary((std::min)(size(), pos));
+		if (needle.empty())
+		{
+			return pos;
+		}
+
+		if (needle.size() > size())
+		{
+			return npos;
+		}
+
+		pos = floor_char_boundary((std::min)(pos, size() - needle.size()));
+		if consteval
+		{
+			for (size_type index = pos + 1; index != 0;)
+			{
+				--index;
+				bool matches = true;
+				for (size_type needle_index = 0; needle_index != needle.size(); ++needle_index)
+				{
+					if (byte_view()[index + needle_index] != needle[needle_index])
+					{
+						matches = false;
+						break;
+					}
+				}
+
+				if (matches)
+				{
+					return index;
+				}
+			}
+
+			return npos;
+		}
+		else
+		{
+			return byte_view().rfind(needle, pos);
+		}
+	}
+
+	constexpr bool is_char_boundary(size_type index) const noexcept
+	{
+		if (index > size()) [[unlikely]]
+		{
+			return false;
+		}
+
+		if (index == 0 || index == size()) [[unlikely]]
+		{
+			return true;
+		}
+
+		return details::is_utf8_lead_byte(static_cast<std::uint8_t>(byte_view()[index]));
+	}
+
+	constexpr size_type char_count() const noexcept
+	{
+		return static_cast<size_type>(std::ranges::distance(chars()));
+	}
+
+	constexpr std::pair<View, View> split(size_type delim) const
+	{
+		if (!is_char_boundary(delim)) [[unlikely]]
+		{
+			throw std::out_of_range("split index must be at a UTF-8 character boundary");
+		}
+
+		const auto lhs = byte_view().substr(0, delim);
+		const auto rhs = byte_view().substr(delim);
+		return {
+			View::from_bytes_unchecked(lhs),
+			View::from_bytes_unchecked(rhs)
+		};
+	}
+
+	constexpr std::optional<utf8_char> char_at(size_type index) const noexcept
+	{
+		if (index >= size() || !is_char_boundary(index)) [[unlikely]]
+		{
+			return std::nullopt;
+		}
+
+		return char_at_unchecked(index);
+	}
+
+	constexpr utf8_char char_at_unchecked(size_type index) const noexcept
+	{
+		const auto len = details::utf8_byte_count_from_lead(static_cast<std::uint8_t>(byte_view()[index]));
+		return utf8_char::from_utf8_bytes_unchecked(byte_view().data() + index, len);
+	}
+
+	constexpr std::optional<View> substr(size_type pos, size_type count = npos) const noexcept
+	{
+		if (!is_char_boundary(pos)) [[unlikely]]
+		{
+			return std::nullopt;
+		}
+
+		const auto end = (count == npos)
+			? size()
+			: (std::min)(size(), pos + count);
+
+		if (!is_char_boundary(end)) [[unlikely]]
+		{
+			return std::nullopt;
+		}
+
+		return View::from_bytes_unchecked(byte_view().substr(pos, end - pos));
+	}
+
+	constexpr utf8_char front() const noexcept
+	{
+		return *chars().begin();
+	}
+
+	constexpr utf8_char back() const noexcept
+	{
+		return *reversed_chars().begin();
+	}
+
+	constexpr bool starts_with(char ch) const noexcept
+	{
+		return !empty() && (front() == ch);
+	}
+
+	constexpr bool starts_with(char8_t ch) const noexcept
+	{
+		return !empty() && (front() == ch);
+	}
+
+	constexpr bool starts_with(utf8_char ch) const noexcept
+	{
+		return !empty() && (front() == ch);
+	}
+
+	constexpr bool starts_with(View sv) const noexcept
+	{
+		return byte_view().starts_with(sv.base());
+	}
+
+	constexpr bool ends_with(char ch) const noexcept
+	{
+		return !empty() && (back() == ch);
+	}
+
+	constexpr bool ends_with(char8_t ch) const noexcept
+	{
+		return !empty() && (back() == ch);
+	}
+
+	constexpr bool ends_with(utf8_char ch) const noexcept
+	{
+		return !empty() && (back() == ch);
+	}
+
+	constexpr bool ends_with(View sv) const noexcept
+	{
+		return byte_view().ends_with(sv.base());
+	}
+
+	constexpr size_type ceil_char_boundary(size_type pos) const noexcept
+	{
+		pos = (std::min)(size(), pos);
+		while (pos != size() && !is_char_boundary(pos))
+		{
+			++pos;
+		}
+
+		return pos;
+	}
+
+	constexpr size_type floor_char_boundary(size_type pos) const noexcept
+	{
+		pos = (std::min)(size(), pos);
+		while (pos != 0 && !is_char_boundary(pos))
+		{
+			--pos;
+		}
+
+		return pos;
+	}
+
+protected:
+	constexpr const Derived& self() const noexcept
+	{
+		return static_cast<const Derived&>(*this);
+	}
+
+	constexpr std::u8string_view byte_view() const noexcept
+	{
+		return std::u8string_view{ self().base() };
+	}
+};
+
+}
+
+}
+
+#endif // UTF8_RANGES_UTF8_STRING_CRTP_HPP

@@ -11,7 +11,9 @@ The current public building blocks are:
 - `utf8_string_view`: borrowed UTF-8 byte view, similar to `std::string_view` but guaranteed to represent a valid UTF-8 string slice
 - `utf8_string`: an owning UTF-8 string, similar to `std::string` but guaranteed to store valid UTF-8
 - `utf8_ranges::views::utf8_view`: lazy iteration over valid UTF-8
+- `utf8_ranges::views::utf16_view`: lazy iteration over valid UTF-16
 - `utf8_ranges::views::reversed_utf8_view`: lazy reverse-order iteration over valid UTF-8
+- `utf8_ranges::views::reversed_utf16_view`: lazy reverse-order iteration over valid UTF-16
 - `utf8_ranges::views::lossy_utf8_view`: lossy iteration over arbitrary byte sequences
 - `utf8_ranges::views::lossy_utf16_view`: lossy iteration over arbitrary UTF-16 code-unit sequences
 
@@ -1706,6 +1708,61 @@ Semantics:
 - dereferencing yields `utf8_char` by value
 - increment uses the current UTF-8 lead byte to advance
 
+### `utf8_ranges::views::utf16_view`
+
+Unchecked forward view over valid UTF-16 code units.
+
+Construction:
+
+```cpp
+static constexpr utf16_view from_code_units_unchecked(std::u16string_view base) noexcept;
+```
+
+Semantics:
+
+- the input must already be valid UTF-16
+- this is a forward range
+- this is not a common range
+- dereferencing yields `utf16_char` by value
+- increment advances by one code unit for BMP scalars and by two code units for surrogate pairs
+
+Example:
+
+```cpp
+constexpr std::u16string_view text = u"Aé😀";
+const auto view = views::utf16_view::from_code_units_unchecked(text);
+
+assert(std::ranges::equal(view, std::array{ u"A"_u16c, u"é"_u16c, u"😀"_u16c }));
+```
+
+### `utf8_ranges::views::reversed_utf16_view`
+
+Unchecked forward view that yields the same UTF-16 characters in reverse order.
+
+Construction:
+
+```cpp
+static constexpr reversed_utf16_view from_code_units_unchecked(std::u16string_view base) noexcept;
+```
+
+Semantics:
+
+- the input must already be valid UTF-16
+- this is a forward range
+- this is not a common range
+- dereferencing yields `utf16_char` by value
+- `begin()` positions at the last UTF-16 character
+- increment walks backward to the previous UTF-16 character boundary, including surrogate-pair starts
+
+Example:
+
+```cpp
+constexpr std::u16string_view text = u"Aé😀";
+const auto view = views::reversed_utf16_view::from_code_units_unchecked(text);
+
+assert(std::ranges::equal(view, std::array{ u"😀"_u16c, u"é"_u16c, u"A"_u16c }));
+```
+
 ### `utf8_ranges::views::reversed_utf8_view`
 
 Unchecked forward view that yields the same characters in reverse order.
@@ -1944,7 +2001,9 @@ Unchecked:
 
 - `utf8_string_view::from_bytes_unchecked`
 - `views::utf8_view::from_bytes_unchecked`
+- `views::utf16_view::from_code_units_unchecked`
 - `views::reversed_utf8_view::from_bytes_unchecked`
+- `views::reversed_utf16_view::from_code_units_unchecked`
 - `utf8_char::from_scalar_unchecked`
 - `utf8_char::from_utf8_bytes_unchecked`
 

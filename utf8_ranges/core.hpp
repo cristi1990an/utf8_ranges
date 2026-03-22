@@ -36,9 +36,6 @@ class basic_utf8_string;
 
 using utf8_string = basic_utf8_string<>;
 
-template <typename Derived, typename View = utf8_string_view>
-class utf8_string_crtp;
-
 enum class utf8_error_code
 {
 	invalid_lead_byte,
@@ -58,6 +55,10 @@ namespace views
 
 	class reversed_utf8_view;
 
+	class utf16_view;
+
+	class reversed_utf16_view;
+
 	template <typename CharT>
 	class lossy_utf8_view;
 
@@ -67,6 +68,9 @@ namespace views
 
 namespace details
 {
+	template <typename Derived, typename View = utf8_string_view>
+	class utf8_string_crtp;
+
 	template<typename From, typename To>
 	concept non_narrowing_convertible =
 		requires(From value)

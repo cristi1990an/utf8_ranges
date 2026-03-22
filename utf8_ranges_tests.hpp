@@ -287,6 +287,35 @@ inline void run_utf8_ranges_tests()
 		assert(encoded[1] == static_cast<char16_t>(0xDE00u));
 	}
 
+	{
+		constexpr std::u16string_view text = u"Aé😀";
+		const auto view = views::utf16_view::from_code_units_unchecked(text);
+		assert(std::ranges::equal(view, std::array{ u"A"_u16c, u"é"_u16c, u"😀"_u16c }));
+	}
+	{
+		const std::u16string text = u"Aé😀";
+		std::string decoded;
+		for (const utf16_char ch : views::utf16_view::from_code_units_unchecked(text))
+		{
+			ch.encode_utf8<char>(std::back_inserter(decoded));
+		}
+		assert(decoded == "A\xC3\xA9\xF0\x9F\x98\x80");
+	}
+	{
+		constexpr std::u16string_view text = u"Aé😀";
+		const auto view = views::reversed_utf16_view::from_code_units_unchecked(text);
+		assert(std::ranges::equal(view, std::array{ u"😀"_u16c, u"é"_u16c, u"A"_u16c }));
+	}
+	{
+		const std::u16string text = u"Aé😀";
+		std::string decoded;
+		for (const utf16_char ch : views::reversed_utf16_view::from_code_units_unchecked(text))
+		{
+			ch.encode_utf8<char>(std::back_inserter(decoded));
+		}
+		assert(decoded == "\xF0\x9F\x98\x80\xC3\xA9" "A");
+	}
+
 	assert(std::format("{:d}", "A"_u8c) == "65");
 	assert(std::format("{:x}", latin1_ch) == "e9");
 	assert(std::format("{:X}", latin1_ch) == "E9");

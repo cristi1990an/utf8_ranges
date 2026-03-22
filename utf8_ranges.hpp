@@ -6,6 +6,7 @@
 #include "utf8_ranges/utf16_char.hpp"
 #include "utf8_ranges/utf8_views.hpp"
 #include "utf8_ranges/utf16_views.hpp"
-#include "utf8_ranges/string.hpp"
+#include "utf8_ranges/utf8_string_view.hpp"
+#include "utf8_ranges/utf8_string.hpp"
 
 #endif // !_UTF8_RANGES_
