@@ -383,13 +383,19 @@ inline void run_utf8_ranges_tests()
 		}
 		assert(decoded == "\xF0\x9F\x98\x80\xC3\xA9" "A");
 	}
-	{
-		const std::array<char16_t, 1> invalid{ static_cast<char16_t>(0xD800u) };
-		const auto result = utf16_string_view::from_code_units({ invalid.data(), invalid.size() });
-		assert(!result.has_value());
-		assert(result.error().code == utf16_error_code::truncated_surrogate_pair);
-		assert(result.error().first_invalid_code_unit_index == 0);
-	}
+		{
+			const std::array<char16_t, 1> invalid{ static_cast<char16_t>(0xD800u) };
+			const auto result = utf16_string_view::from_code_units({ invalid.data(), invalid.size() });
+			if (result.has_value())
+			{
+				assert(false);
+			}
+			else
+			{
+				assert(result.error().code == utf16_error_code::truncated_surrogate_pair);
+				assert(result.error().first_invalid_code_unit_index == 0);
+			}
+		}
 
 	assert(std::format("{:d}", "A"_u8c) == "65");
 	assert(std::format("{:x}", latin1_ch) == "e9");

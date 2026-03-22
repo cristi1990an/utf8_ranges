@@ -60,19 +60,101 @@ public:
 	constexpr size_type find(char16_t ch, size_type pos = 0) const noexcept
 	{
 		pos = (std::min)(size(), pos);
-		return code_unit_view().find(ch, pos);
+		if consteval
+		{
+			for (size_type index = pos; index != size(); ++index)
+			{
+				if (code_unit_view()[index] == ch)
+				{
+					return index;
+				}
+			}
+
+			return npos;
+		}
+		else
+		{
+			return code_unit_view().find(ch, pos);
+		}
 	}
 
 	constexpr size_type find(utf16_char ch, size_type pos = 0) const noexcept
 	{
 		pos = ceil_char_boundary((std::min)(size(), pos));
-		return code_unit_view().find(ch.as_view(), pos);
+		const auto needle = ch.as_view();
+		if consteval
+		{
+			if (needle.size() > size() - pos)
+			{
+				return npos;
+			}
+
+			for (size_type index = pos; index + needle.size() <= size(); ++index)
+			{
+				bool matches = true;
+				for (size_type needle_index = 0; needle_index != needle.size(); ++needle_index)
+				{
+					if (code_unit_view()[index + needle_index] != needle[needle_index])
+					{
+						matches = false;
+						break;
+					}
+				}
+
+				if (matches)
+				{
+					return index;
+				}
+			}
+
+			return npos;
+		}
+		else
+		{
+			return code_unit_view().find(needle, pos);
+		}
 	}
 
 	constexpr size_type find(View sv, size_type pos = 0) const noexcept
 	{
 		pos = ceil_char_boundary((std::min)(size(), pos));
-		return code_unit_view().find(sv.base(), pos);
+		const auto needle = sv.base();
+		if (needle.empty())
+		{
+			return pos;
+		}
+
+		if consteval
+		{
+			if (needle.size() > size() - pos)
+			{
+				return npos;
+			}
+
+			for (size_type index = pos; index + needle.size() <= size(); ++index)
+			{
+				bool matches = true;
+				for (size_type needle_index = 0; needle_index != needle.size(); ++needle_index)
+				{
+					if (code_unit_view()[index + needle_index] != needle[needle_index])
+					{
+						matches = false;
+						break;
+					}
+				}
+
+				if (matches)
+				{
+					return index;
+				}
+			}
+
+			return npos;
+		}
+		else
+		{
+			return code_unit_view().find(needle, pos);
+		}
 	}
 
 	constexpr size_type rfind(char16_t ch, size_type pos = npos) const noexcept
@@ -83,7 +165,23 @@ public:
 		}
 
 		pos = (std::min)(size() - 1, pos);
-		return code_unit_view().rfind(ch, pos);
+		if consteval
+		{
+			for (size_type index = pos + 1; index != 0;)
+			{
+				--index;
+				if (code_unit_view()[index] == ch)
+				{
+					return index;
+				}
+			}
+
+			return npos;
+		}
+		else
+		{
+			return code_unit_view().rfind(ch, pos);
+		}
 	}
 
 	constexpr size_type rfind(utf16_char ch, size_type pos = npos) const noexcept
@@ -96,7 +194,33 @@ public:
 
 		pos = floor_char_boundary((std::min)(size(), pos));
 		pos = floor_char_boundary((std::min)(pos, size() - needle.size()));
-		return code_unit_view().rfind(needle, pos);
+		if consteval
+		{
+			for (size_type index = pos + 1; index != 0;)
+			{
+				--index;
+				bool matches = true;
+				for (size_type needle_index = 0; needle_index != needle.size(); ++needle_index)
+				{
+					if (code_unit_view()[index + needle_index] != needle[needle_index])
+					{
+						matches = false;
+						break;
+					}
+				}
+
+				if (matches)
+				{
+					return index;
+				}
+			}
+
+			return npos;
+		}
+		else
+		{
+			return code_unit_view().rfind(needle, pos);
+		}
 	}
 
 	constexpr size_type rfind(View sv, size_type pos = npos) const noexcept
@@ -114,7 +238,33 @@ public:
 		}
 
 		pos = floor_char_boundary((std::min)(pos, size() - needle.size()));
-		return code_unit_view().rfind(needle, pos);
+		if consteval
+		{
+			for (size_type index = pos + 1; index != 0;)
+			{
+				--index;
+				bool matches = true;
+				for (size_type needle_index = 0; needle_index != needle.size(); ++needle_index)
+				{
+					if (code_unit_view()[index + needle_index] != needle[needle_index])
+					{
+						matches = false;
+						break;
+					}
+				}
+
+				if (matches)
+				{
+					return index;
+				}
+			}
+
+			return npos;
+		}
+		else
+		{
+			return code_unit_view().rfind(needle, pos);
+		}
 	}
 
 	constexpr bool is_char_boundary(size_type index) const noexcept
