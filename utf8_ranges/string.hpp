@@ -783,7 +783,7 @@ public:
 
 	constexpr void pop_back()
 	{
-		const auto bytes_to_remove = (*(this->reversed_chars().begin())).byte_count();
+		const auto bytes_to_remove = (*(this->reversed_chars().begin())).code_unit_count();
 		const auto where_idx = base_.size() - bytes_to_remove;
 		base_.erase(where_idx, bytes_to_remove);
 	}
@@ -845,7 +845,7 @@ public:
 			throw std::out_of_range("replace index must be at a UTF-8 character boundary");
 		}
 
-		const auto replace_count = this->char_at_unchecked(pos).byte_count();
+		const auto replace_count = this->char_at_unchecked(pos).code_unit_count();
 		base_.replace(pos, replace_count, other.base());
 		return *this;
 	}
@@ -862,7 +862,7 @@ public:
 			throw std::out_of_range("replace index must be at a UTF-8 character boundary");
 		}
 
-		const auto replace_count = this->char_at_unchecked(pos).byte_count();
+		const auto replace_count = this->char_at_unchecked(pos).code_unit_count();
 		base_.replace(pos, replace_count, other.as_view());
 		return *this;
 	}
@@ -936,7 +936,7 @@ public:
 			throw std::out_of_range("replace index must be at a UTF-8 character boundary");
 		}
 
-		const auto replace_count = this->char_at_unchecked(pos).byte_count();
+		const auto replace_count = this->char_at_unchecked(pos).code_unit_count();
 #if defined(__cpp_lib_containers_ranges) && __cpp_lib_containers_ranges >= 202202L
 		struct encoded_utf8_char_range
 		{

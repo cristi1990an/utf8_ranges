@@ -48,7 +48,7 @@ public:
 	[[nodiscard]]
 	constexpr std::uint32_t as_scalar() const noexcept
 	{
-		return details::decode_valid_utf8_char(std::u8string_view{ bytes_.data(), byte_count() });
+		return details::decode_valid_utf8_char(std::u8string_view{ bytes_.data(), code_unit_count() });
 	}
 
 	[[nodiscard]]
@@ -60,7 +60,7 @@ public:
 	[[nodiscard]]
 	constexpr std::u8string_view as_view() const noexcept
 	{
-		return { bytes_.data(), byte_count() };
+		return { bytes_.data(), code_unit_count() };
 	}
 
 	constexpr utf8_string_view as_utf8_view() const noexcept;
@@ -584,7 +584,7 @@ public:
 	}
 
 	[[nodiscard]]
-	constexpr std::size_t byte_count() const noexcept
+	constexpr std::size_t code_unit_count() const noexcept
 	{
 		return details::utf8_byte_count_from_lead(static_cast<std::uint8_t>(bytes_[0]));
 	}
@@ -674,11 +674,11 @@ private:
 		return static_cast<std::uint8_t>(bytes_[0]) != invalid_sentinel_byte;
 	}
 
-	constexpr std::size_t maybe_invalid_byte_count() const noexcept
+	constexpr std::size_t maybe_invalid_code_unit_count() const noexcept
 	{
 		if (is_valid()) [[likely]]
 		{
-			return byte_count();
+			return code_unit_count();
 		}
 		else
 		{

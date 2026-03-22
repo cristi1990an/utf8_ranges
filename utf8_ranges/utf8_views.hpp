@@ -235,7 +235,7 @@ namespace views
 
 			constexpr iterator& operator++() noexcept
 			{
-				current_ += static_cast<difference_type>(current_char_.maybe_invalid_byte_count());
+				current_ += static_cast<difference_type>(current_char_.maybe_invalid_code_unit_count());
 				load_current();
 				return *this;
 			}

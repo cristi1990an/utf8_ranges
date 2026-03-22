@@ -35,6 +35,7 @@ tracking local work before it is tagged or versioned.
 
 ### Changed
 
+- `utf8_char::byte_count()` has been renamed to `code_unit_count()`
 - `utf8_string_view::char_at(index)` now interprets `index` as a byte index and returns `std::nullopt` when the index is out of range or not a UTF-8 character boundary
 - `utf8_string` is now an alias for `basic_utf8_string<>`, which lets `std::ranges::to<utf8_string>()` work naturally
 - library headers now use ordinary include guards instead of `#pragma once`

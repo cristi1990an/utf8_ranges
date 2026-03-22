@@ -165,7 +165,7 @@ using namespace utf8_ranges::literals;
 constexpr utf8_char euro = "€"_u8c;
 constexpr utf8_string_view text = "Aé€"_utf8_sv;
 
-static_assert(euro.byte_count() == 3);
+static_assert(euro.code_unit_count() == 3);
 static_assert(text.size() == 6);
 ```
 
@@ -318,7 +318,7 @@ struct utf8_char
     constexpr bool eq_ignore_ascii_case(utf8_char other) const noexcept;
     constexpr void swap(utf8_char& other) noexcept;
 
-    constexpr std::size_t byte_count() const noexcept;
+    constexpr std::size_t code_unit_count() const noexcept;
 
     template<class CharT, class OutIt>
     constexpr std::size_t encode_utf8(OutIt out) const noexcept;
@@ -438,21 +438,21 @@ constexpr operator std::u8string_view() const noexcept;
 
 Implicit conversion to `std::u8string_view`.
 
-#### `byte_count`
+#### `code_unit_count`
 
 ```cpp
-constexpr std::size_t byte_count() const noexcept;
+constexpr std::size_t code_unit_count() const noexcept;
 ```
 
-Returns the length of the encoded UTF-8 sequence in bytes.
+Returns the length of the encoded UTF-8 sequence in code units, i.e. bytes.
 
 Example:
 
 ```cpp
-static_assert("A"_u8c.byte_count() == 1);
-static_assert("é"_u8c.byte_count() == 2);
-static_assert("€"_u8c.byte_count() == 3);
-static_assert("😀"_u8c.byte_count() == 4);
+static_assert("A"_u8c.code_unit_count() == 1);
+static_assert("é"_u8c.code_unit_count() == 2);
+static_assert("€"_u8c.code_unit_count() == 3);
+static_assert("😀"_u8c.code_unit_count() == 4);
 ```
 
 ### Encoding
@@ -494,8 +494,10 @@ Constraints:
 
 - `CharT` is an integral type
 - `CharT` is not `bool`
-- `char16_t` is convertible to `CharT`
+- `CharT` accepts `char16_t` without narrowing
 - `OutIt` models `std::output_iterator<OutIt, CharT>`
+
+This rejects destinations such as `char8_t` where a UTF-16 code unit would be narrowed.
 
 Example:
 
@@ -626,7 +628,8 @@ Use `utf16_char` when:
 Compared to `utf8_char`, the main differences are:
 
 - the stored representation is UTF-16 code units rather than UTF-8 bytes
-- the size query is `code_unit_count()` rather than `byte_count()`
+- both `utf8_char` and `utf16_char` expose `code_unit_count()`
+- the difference is the encoded code-unit type: UTF-8 bytes versus UTF-16 code units
 - construction is from UTF-16 code units rather than UTF-8 bytes
 - it does not expose `as_utf8_view()`, because there is no `utf16_string_view` type yet
 
@@ -794,7 +797,14 @@ constexpr std::size_t encode_utf16(OutIt out) const noexcept;
 
 Copies the stored UTF-16 code units into `out` and returns the number of written code units.
 
-`CharT` must accept `char16_t` without narrowing.
+Constraints:
+
+- `CharT` is an integral type
+- `CharT` is not `bool`
+- `CharT` accepts `char16_t` without narrowing
+- `OutIt` models `std::output_iterator<OutIt, CharT>`
+
+This rejects destinations such as `char8_t` where a UTF-16 code unit would be narrowed.
 
 #### `encode_utf8`
 
