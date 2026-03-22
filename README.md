@@ -55,14 +55,14 @@ The nested namespace `unicode_ranges::details` contains implementation details o
 
 This library is built around a few explicit design choices:
 
-- UTF-8 is the canonical storage format.
+- Unicode scalar values are the canonical model, with UTF-8 and UTF-16 as first-class encodings.
 - No sacrifices to performance while offering a safe, modern, and versatile API.
 - The library is designed to remain `constexpr`-friendly where practical.
 - Unsafe APIs are explicitly marked as `unchecked`.
 - String-like APIs lean toward C++ STL-style naming and behavior while borrowing design choices from Rust.
 - Classification APIs expose both ASCII-only and Unicode-aware predicates.
 
-In particular, UTF-8 literals and many core operations are intended to remain usable in constant evaluation.
+In particular, Unicode literals and many core operations are intended to remain usable in constant evaluation.
 
 The library is not a grapheme cluster library. A single user-perceived "character" may still consist of multiple Unicode scalar values.
 

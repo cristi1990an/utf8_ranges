@@ -15,6 +15,7 @@ using namespace unicode_ranges::literals;
 
 inline void run_utf8_ranges_tests()
 {
+	// Shared test helpers used by both the UTF-8 and UTF-16 sections.
 	[[maybe_unused]] const auto wide_from_scalar = [](std::uint32_t scalar)
 	{
 		std::wstring result;
@@ -54,6 +55,7 @@ inline void run_utf8_ranges_tests()
 	constexpr auto utf8_text = "Aé€"_utf8_sv;
 	constexpr auto utf16_text = u"Aé😀"_utf16_sv;
 
+	// utf8_char compile-time API coverage.
 	static_assert("A"_u8c.ascii_lowercase() == "a"_u8c);
 	static_assert("z"_u8c.ascii_uppercase() == "Z"_u8c);
 	static_assert(latin1_ch.ascii_lowercase() == latin1_ch);
@@ -100,6 +102,7 @@ inline void run_utf8_ranges_tests()
 		return lhs == "z"_u8c && rhs == "A"_u8c;
 	}());
 
+	// utf8_string_view compile-time API coverage.
 	static_assert(utf8_text.size() == 6);
 	static_assert(utf8_text == "Aé€"_utf8_sv);
 	static_assert(utf8_text.is_char_boundary(0));
@@ -160,6 +163,7 @@ inline void run_utf8_ranges_tests()
 	static_assert(utf8_text == "Aé€"_utf8_sv);
 	static_assert(utf8_text < "Z"_utf8_sv);
 
+	// utf16_string_view mirrors the utf8_string_view API, but with UTF-16 code-unit semantics.
 	static_assert(utf16_text.size() == 4);
 	static_assert(utf16_text == u"Aé😀"_utf16_sv);
 	static_assert(utf16_text.is_char_boundary(0));
@@ -215,6 +219,7 @@ inline void run_utf8_ranges_tests()
 	static_assert(utf16_text == u"Aé😀"_utf16_sv);
 	static_assert(utf16_text < u"Z"_utf16_sv);
 
+	// utf8_char scalar stepping and UTF-16 encoding edge cases.
 	static_assert([] {
 		utf8_char ch = utf8_char::from_scalar_unchecked(0x7Fu);
 		const utf8_char old = ch++;
@@ -271,6 +276,7 @@ inline void run_utf8_ranges_tests()
 			&& buffer[1] == static_cast<char16_t>(0xDE00u);
 	}());
 
+	// utf16_char parity with utf8_char.
 	static_assert(utf16_char::from_scalar(0x20ACu).has_value());
 	static_assert(!utf16_char::from_scalar(0x110000u).has_value());
 	static_assert(utf16_char::from_utf16_code_units(u"€", 1).has_value());
@@ -317,9 +323,10 @@ inline void run_utf8_ranges_tests()
 		return n == 3
 			&& static_cast<unsigned char>(buffer[0]) == 0xE2u
 			&& static_cast<unsigned char>(buffer[1]) == 0x82u
-			&& static_cast<unsigned char>(buffer[2]) == 0xACu;
+				&& static_cast<unsigned char>(buffer[2]) == 0xACu;
 	}());
 
+	// Runtime formatting and transcoding checks.
 	assert(std::format("{}", "A"_u8c) == "A");
 	assert(std::format("{:c}", latin1_ch) == "\xC3\xA9");
 	assert(std::format("{:c}", "€"_u8c) == "\xE2\x82\xAC");
@@ -355,6 +362,7 @@ inline void run_utf8_ranges_tests()
 		assert(encoded[1] == static_cast<char16_t>(0xDE00u));
 	}
 
+	// Direct UTF-16 view iteration, both forward and reverse.
 	{
 		constexpr std::u16string_view text = u"Aé😀";
 		[[maybe_unused]] const auto view = views::utf16_view::from_code_units_unchecked(text);
@@ -369,34 +377,36 @@ inline void run_utf8_ranges_tests()
 		}
 		assert(decoded == "A\xC3\xA9\xF0\x9F\x98\x80");
 	}
-	{
-		constexpr std::u16string_view text = u"Aé😀";
-		[[maybe_unused]] const auto view = views::reversed_utf16_view::from_code_units_unchecked(text);
-		assert(std::ranges::equal(view, std::array{ u"😀"_u16c, u"é"_u16c, u"A"_u16c }));
-	}
-	{
-		const std::u16string text = u"Aé😀";
-		std::string decoded;
-		for (const utf16_char ch : views::reversed_utf16_view::from_code_units_unchecked(text))
 		{
-			ch.encode_utf8<char>(std::back_inserter(decoded));
+			constexpr std::u16string_view text = u"Aé😀";
+			[[maybe_unused]] const auto view = views::reversed_utf16_view::from_code_units_unchecked(text);
+			assert(std::ranges::equal(view, std::array{ u"😀"_u16c, u"é"_u16c, u"A"_u16c }));
 		}
-		assert(decoded == "\xF0\x9F\x98\x80\xC3\xA9" "A");
-	}
 		{
-			const std::array<char16_t, 1> invalid{ static_cast<char16_t>(0xD800u) };
-			const auto result = utf16_string_view::from_code_units({ invalid.data(), invalid.size() });
-			if (result.has_value())
+			const std::u16string text = u"Aé😀";
+			std::string decoded;
+			for (const utf16_char ch : views::reversed_utf16_view::from_code_units_unchecked(text))
 			{
-				assert(false);
+				ch.encode_utf8<char>(std::back_inserter(decoded));
 			}
-			else
-			{
-				assert(result.error().code == utf16_error_code::truncated_surrogate_pair);
-				assert(result.error().first_invalid_code_unit_index == 0);
-			}
+			assert(decoded == "\xF0\x9F\x98\x80\xC3\xA9" "A");
 		}
+	{
+		// Invalid UTF-16 must report the first failing code-unit index.
+		const std::array<char16_t, 1> invalid{ static_cast<char16_t>(0xD800u) };
+		const auto result = utf16_string_view::from_code_units({ invalid.data(), invalid.size() });
+		if (result.has_value())
+		{
+			assert(false);
+		}
+		else
+		{
+			assert(result.error().code == utf16_error_code::truncated_surrogate_pair);
+			assert(result.error().first_invalid_code_unit_index == 0);
+		}
+	}
 
+	// Formatting ranges by first materializing them into owning strings.
 	assert(std::format("{:d}", "A"_u8c) == "65");
 	assert(std::format("{:x}", latin1_ch) == "e9");
 	assert(std::format("{:X}", latin1_ch) == "E9");
@@ -412,6 +422,7 @@ inline void run_utf8_ranges_tests()
 	assert(std::format("{:>6s}", utf8_text.chars() | std::ranges::to<utf8_string>()) == "   A" "\xC3\xA9" "\xE2\x82\xAC");
 	assert(std::format("{:_<6s}", utf8_text.reversed_chars() | std::ranges::to<utf8_string>()) == "\xE2\x82\xAC" "\xC3\xA9" "A___");
 
+	// Owning UTF-8 string construction, concatenation, and mutation coverage.
 	assert(utf8_string{}.base().empty());
 	static_assert(std::same_as<utf8_string::value_type, utf8_char>);
 	static_assert(std::same_as<decltype(utf8_string{}.get_allocator()), std::allocator<char8_t>>);
@@ -438,6 +449,8 @@ inline void run_utf8_ranges_tests()
 		const auto reversed = utf8_text.reversed_chars() | std::ranges::to<utf8_string>();
 		assert(reversed == "€éA"_utf8_sv);
 	}
+
+	// Owning UTF-16 string construction, concatenation, and mutation coverage.
 	assert(utf16_string{}.base().empty());
 	static_assert(std::same_as<utf16_string::value_type, utf16_char>);
 	static_assert(std::same_as<decltype(utf16_string{}.get_allocator()), std::allocator<char16_t>>);
@@ -531,6 +544,8 @@ inline void run_utf8_ranges_tests()
 		s.replace_with_range(1, std::array{ u"Ω"_u16c, u"!"_u16c });
 		assert(s == u"AΩ!😀"_utf16_sv);
 	}
+
+	// UTF-8 mutation failure cases should throw rather than silently splitting characters.
 	{
 		utf8_string s;
 		s.assign("Aé€"_utf8_sv);
@@ -678,6 +693,7 @@ inline void run_utf8_ranges_tests()
 		}
 	}
 
+	// Formatting, hashing, and stream insertion for borrowed and owning strings.
 	assert(std::format("{}", utf8_text) == "A\xC3\xA9\xE2\x82\xAC");
 	assert(std::format("{}", utf16_text) == "A\xC3\xA9\xF0\x9F\x98\x80");
 	assert(std::hash<utf8_string_view>{}(utf8_text) == std::hash<utf8_string_view>{}("Aé€"_utf8_sv));
@@ -692,12 +708,13 @@ inline void run_utf8_ranges_tests()
 		oss << utf16_text;
 		assert(oss.str() == "A\xC3\xA9\xF0\x9F\x98\x80");
 	}
-	{
-		std::ostringstream oss;
-		oss << utf8_string{ utf8_text };
-		assert(oss.str() == "A\xC3\xA9\xE2\x82\xAC");
-	}
+		{
+			std::ostringstream oss;
+			oss << utf8_string{ utf8_text };
+			assert(oss.str() == "A\xC3\xA9\xE2\x82\xAC");
+		}
 
+	// Lossy views replace malformed input with the Unicode replacement character.
 	assert(!utf8_char::from_scalar(0x110000u).has_value());
 	assert(std::format("{}", utf8_char::replacement_character) == "\xEF\xBF\xBD");
 	assert(std::format("{:x}", utf8_char::replacement_character) == "fffd");
