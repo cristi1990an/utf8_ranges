@@ -29,6 +29,7 @@ namespace utf8_ranges
 {
 
 class utf8_string_view;
+struct utf16_char;
 
 template <typename Allocator = std::allocator<char8_t>>
 class basic_utf8_string;
@@ -59,10 +60,20 @@ namespace views
 
 	template <typename CharT>
 	class lossy_utf8_view;
+
+	template <typename CharT>
+	class lossy_utf16_view;
 }
 
 namespace details
 {
+	template<typename From, typename To>
+	concept non_narrowing_convertible =
+		requires(From value)
+	{
+		To{ value };
+	};
+
 	template<typename CharT>
 	inline constexpr bool is_single_valid_utf8_char(std::basic_string_view<CharT> value) noexcept
 	{
@@ -198,6 +209,82 @@ namespace details
 		return encode_unicode_scalar_utf8_unchecked(scalar, out);
 	}
 
+	template<typename CharT>
+	inline constexpr bool is_single_valid_utf16_char(std::basic_string_view<CharT> value) noexcept
+	{
+		if (value.empty()) [[unlikely]]
+		{
+			return false;
+		}
+
+		const auto code_unit = [&value](std::size_t index) noexcept -> std::uint16_t
+		{
+			return static_cast<std::uint16_t>(value[index]);
+		};
+
+		const auto first = code_unit(0);
+		const bool first_is_high_surrogate = first >= 0xD800u && first <= 0xDBFFu;
+		const bool first_is_low_surrogate = first >= 0xDC00u && first <= 0xDFFFu;
+
+		if (value.size() == 1) [[likely]]
+		{
+			return !first_is_high_surrogate && !first_is_low_surrogate;
+		}
+
+		if (value.size() == 2)
+		{
+			const auto second = code_unit(1);
+			const bool second_is_low_surrogate = second >= 0xDC00u && second <= 0xDFFFu;
+			return first_is_high_surrogate && second_is_low_surrogate;
+		}
+
+		return false;
+	}
+
+	template<typename CharT>
+	requires (std::is_integral_v<CharT>
+		&& !std::is_same_v<CharT, bool>
+		&& non_narrowing_convertible<char16_t, CharT>)
+	inline constexpr std::size_t encode_unicode_scalar_utf16_unchecked(std::uint32_t scalar, CharT* out) noexcept
+	{
+		if (scalar <= 0xFFFFu) [[likely]]
+		{
+			out[0] = static_cast<CharT>(scalar);
+			return 1;
+		}
+
+		const auto shifted = scalar - 0x10000u;
+		out[0] = static_cast<CharT>(0xD800u + (shifted >> 10));
+		out[1] = static_cast<CharT>(0xDC00u + (shifted & 0x3FFu));
+		return 2;
+	}
+
+	template<typename CharT>
+	requires (std::is_integral_v<CharT>
+		&& !std::is_same_v<CharT, bool>
+		&& non_narrowing_convertible<char16_t, CharT>)
+	inline constexpr std::size_t encode_unicode_scalar_utf16(std::uint32_t scalar, CharT* out) noexcept
+	{
+		if (!is_valid_unicode_scalar(scalar)) [[unlikely]]
+		{
+			return 0;
+		}
+		return encode_unicode_scalar_utf16_unchecked(scalar, out);
+	}
+
+	inline constexpr std::size_t encode_unicode_scalar_wchar_unchecked(std::uint32_t scalar, wchar_t* out) noexcept
+	{
+		if constexpr (sizeof(wchar_t) == 2)
+		{
+			return encode_unicode_scalar_utf16_unchecked(scalar, out);
+		}
+		else
+		{
+			out[0] = static_cast<wchar_t>(scalar);
+			return 1;
+		}
+	}
+
 	inline constexpr std::size_t utf8_byte_count_from_lead(std::uint8_t lead) noexcept
 	{
 		if (lead <= 0x7Fu) [[likely]]
@@ -306,6 +393,19 @@ namespace details
 			(static_cast<std::uint32_t>(byte(3) & 0x3Fu));
 	}
 
+	template<typename CharT>
+	inline constexpr std::uint32_t decode_valid_utf16_char(std::basic_string_view<CharT> ch) noexcept
+	{
+		if (ch.size() == 1) [[likely]]
+		{
+			return static_cast<std::uint16_t>(ch[0]);
+		}
+
+		const auto high = static_cast<std::uint16_t>(ch[0]) - 0xD800u;
+		const auto low = static_cast<std::uint16_t>(ch[1]) - 0xDC00u;
+		return 0x10000u + (static_cast<std::uint32_t>(high) << 10) + low;
+	}
+
 	namespace literals
 	{
 		template<typename CharT, std::size_t N>
@@ -348,6 +448,30 @@ namespace details
 			}
 
 			consteval const char8_t* data() const noexcept
+			{
+				return &p[0];
+			}
+		};
+
+		template<typename CharT, std::size_t N>
+		struct constexpr_utf16_character
+		{
+			CharT p[N]{};
+
+			static constexpr std::size_t SIZE = N;
+			using CHAR_T = CharT;
+
+			consteval constexpr_utf16_character(CharT const(&pp)[N])
+			{
+				std::ranges::copy(pp, p);
+
+				if (!details::is_single_valid_utf16_char(std::basic_string_view<CharT>{ &p[0], N - 1 }))
+				{
+					throw std::invalid_argument("literal must contain exactly one valid UTF-16 character");
+				}
+			}
+
+			consteval const CharT* data() const noexcept
 			{
 				return &p[0];
 			}

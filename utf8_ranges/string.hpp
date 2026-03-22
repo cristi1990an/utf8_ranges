@@ -1,7 +1,7 @@
 #ifndef UTF8_RANGES_STRING_HPP
 #define UTF8_RANGES_STRING_HPP
 
-#include "views.hpp"
+#include "utf8_views.hpp"
 
 namespace utf8_ranges
 {
@@ -1035,24 +1035,94 @@ public:
 		base_.swap(other.base_);
 	}
 
-	friend constexpr basic_utf8_string operator+(basic_utf8_string lhs, utf8_string_view rhs)
+	friend constexpr bool operator==(const basic_utf8_string& lhs, const basic_utf8_string& rhs) noexcept
 	{
-		return from_bytes_unchecked(std::move(lhs.base_) + base_type{ rhs.base() });
+		return lhs.base_ == rhs.base_;
 	}
 
-	friend constexpr basic_utf8_string operator+(utf8_string_view lhs, basic_utf8_string rhs)
+	friend constexpr bool operator==(const basic_utf8_string& lhs, utf8_string_view rhs) noexcept
 	{
-		return from_bytes_unchecked(base_type{ lhs.base() } + std::move(rhs.base_));
+		return lhs.base_ == rhs.base();
 	}
 
-	friend constexpr basic_utf8_string operator+(basic_utf8_string lhs, utf8_char rhs)
+	friend constexpr bool operator==(utf8_string_view lhs, const basic_utf8_string& rhs) noexcept
 	{
-		return from_bytes_unchecked(std::move(lhs.base_) + base_type{ rhs.as_view() });
+		return lhs.base() == rhs.base_;
 	}
 
-	friend constexpr basic_utf8_string operator+(utf8_char lhs, basic_utf8_string rhs)
+	friend constexpr auto operator<=>(const basic_utf8_string& lhs, const basic_utf8_string& rhs) noexcept
 	{
-		return from_bytes_unchecked(base_type{ lhs.as_view() } + std::move(rhs.base_));
+		return lhs.base_ <=> rhs.base_;
+	}
+
+	friend constexpr auto operator<=>(const basic_utf8_string& lhs, utf8_string_view rhs) noexcept
+	{
+		return lhs.base_ <=> rhs.base();
+	}
+
+	friend constexpr auto operator<=>(utf8_string_view lhs, const basic_utf8_string& rhs) noexcept
+	{
+		return lhs.base() <=> rhs.base_;
+	}
+
+	friend constexpr basic_utf8_string operator+(const basic_utf8_string& lhs, const basic_utf8_string& rhs)
+	{
+		return from_bytes_unchecked(lhs.base_ + rhs.base_);
+	}
+
+	friend constexpr basic_utf8_string operator+(basic_utf8_string&& lhs, const basic_utf8_string& rhs)
+	{
+		return from_bytes_unchecked(std::move(lhs.base_) + rhs.base_);
+	}
+
+	friend constexpr basic_utf8_string operator+(const basic_utf8_string& lhs, basic_utf8_string&& rhs)
+	{
+		return from_bytes_unchecked(lhs.base_ + std::move(rhs.base_));
+	}
+
+	friend constexpr basic_utf8_string operator+(basic_utf8_string&& lhs, basic_utf8_string&& rhs)
+	{
+		return from_bytes_unchecked(std::move(lhs.base_) + std::move(rhs.base_));
+	}
+
+	friend constexpr basic_utf8_string operator+(const basic_utf8_string& lhs, utf8_string_view rhs)
+	{
+		return from_bytes_unchecked(lhs.base_ + base_type{ rhs.base(), lhs.get_allocator() });
+	}
+
+	friend constexpr basic_utf8_string operator+(basic_utf8_string&& lhs, utf8_string_view rhs)
+	{
+		return from_bytes_unchecked(std::move(lhs.base_) + base_type{ rhs.base(), lhs.get_allocator() });
+	}
+
+	friend constexpr basic_utf8_string operator+(utf8_string_view lhs, const basic_utf8_string& rhs)
+	{
+		return from_bytes_unchecked(base_type{ lhs.base(), rhs.get_allocator() } + rhs.base_);
+	}
+
+	friend constexpr basic_utf8_string operator+(utf8_string_view lhs, basic_utf8_string&& rhs)
+	{
+		return from_bytes_unchecked(base_type{ lhs.base(), rhs.get_allocator() } + std::move(rhs.base_));
+	}
+
+	friend constexpr basic_utf8_string operator+(const basic_utf8_string& lhs, utf8_char rhs)
+	{
+		return from_bytes_unchecked(lhs.base_ + base_type{ rhs.as_view(), lhs.get_allocator() });
+	}
+
+	friend constexpr basic_utf8_string operator+(basic_utf8_string&& lhs, utf8_char rhs)
+	{
+		return from_bytes_unchecked(std::move(lhs.base_) + base_type{ rhs.as_view(), lhs.get_allocator() });
+	}
+
+	friend constexpr basic_utf8_string operator+(utf8_char lhs, const basic_utf8_string& rhs)
+	{
+		return from_bytes_unchecked(base_type{ lhs.as_view(), rhs.get_allocator() } + rhs.base_);
+	}
+
+	friend constexpr basic_utf8_string operator+(utf8_char lhs, basic_utf8_string&& rhs)
+	{
+		return from_bytes_unchecked(base_type{ lhs.as_view(), rhs.get_allocator() } + std::move(rhs.base_));
 	}
 
 private:
@@ -1138,7 +1208,7 @@ namespace literals
 	}
 
 	template<details::literals::constexpr_utf8_string Str>
-	consteval auto operator ""_utf8_s()
+	constexpr auto operator ""_utf8_s()
 	{
 		const auto sv = std::u8string_view{ Str.data(), decltype(Str)::SIZE - 1 };
 		const auto result = utf8_string_view::from_bytes(sv);

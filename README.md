@@ -2,14 +2,18 @@
 
 `utf8_ranges` is a header-only C++ library for representing, validating, iterating, and formatting UTF-8 text in C++.
 
-The library models UTF-8 text in a few distinct layers:
+The library currently focuses on UTF-8 text, with a small UTF-16-native layer that is meant to grow over time.
+
+The current public building blocks are:
 
 - `utf8_char`: one Unicode scalar value stored as its encoded UTF-8 byte sequence, guaranteed to represent a valid UTF-8 character
+- `utf16_char`: one Unicode scalar value stored as its encoded UTF-16 code units, guaranteed to represent a valid UTF-16 character
 - `utf8_string_view`: borrowed UTF-8 byte view, similar to `std::string_view` but guaranteed to represent a valid UTF-8 string slice
 - `utf8_string`: an owning UTF-8 string, similar to `std::string` but guaranteed to store valid UTF-8
 - `utf8_ranges::views::utf8_view`: lazy iteration over valid UTF-8
 - `utf8_ranges::views::reversed_utf8_view`: lazy reverse-order iteration over valid UTF-8
 - `utf8_ranges::views::lossy_utf8_view`: lossy iteration over arbitrary byte sequences
+- `utf8_ranges::views::lossy_utf16_view`: lossy iteration over arbitrary UTF-16 code-unit sequences
 
 The public entry point is:
 
@@ -31,12 +35,13 @@ The nested namespace `utf8_ranges::details` contains implementation details only
 4. [Quick start](#quick-start)
 5. [Error model](#error-model)
 6. [Reference: utf8_char](#reference-utf8_char)
-7. [Reference: utf8_string_view](#reference-utf8_string_view)
-8. [Reference: utf8_string](#reference-utf8_string)
-9. [Reference: views](#reference-views)
-10. [Reference: literals](#reference-literals)
-11. [Reference: formatting, streaming, hashing](#reference-formatting-streaming-hashing)
-12. [Semantics notes](#semantics-notes)
+7. [Reference: utf16_char](#reference-utf16_char)
+8. [Reference: utf8_string_view](#reference-utf8_string_view)
+9. [Reference: utf8_string](#reference-utf8_string)
+10. [Reference: views](#reference-views)
+11. [Reference: literals](#reference-literals)
+12. [Reference: formatting, streaming, hashing](#reference-formatting-streaming-hashing)
+13. [Semantics notes](#semantics-notes)
 
 ## Goals
 
@@ -147,7 +152,6 @@ constexpr utf8_char euro = "€"_u8c;
 constexpr auto text = "Aé€"_utf8_sv;
 
 static_assert(euro.as_scalar() == 0x20AC);
-static_assert(euro.as_view() == u8"€");
 static_assert(text.size() == 6);
 static_assert(text.char_count() == 3);
 ```
@@ -318,6 +322,9 @@ struct utf8_char
 
     template<class CharT, class OutIt>
     constexpr std::size_t encode_utf8(OutIt out) const noexcept;
+
+    template<class CharT, class OutIt>
+    constexpr std::size_t encode_utf16(OutIt out) const noexcept;
 };
 ```
 
@@ -474,6 +481,33 @@ const auto n = "€"_u8c.encode_utf8<char>(buffer.begin());
 assert(std::string_view{ buffer.data(), n } == "\xE2\x82\xAC");
 ```
 
+#### `encode_utf16`
+
+```cpp
+template<class CharT, class OutIt>
+constexpr std::size_t encode_utf16(OutIt out) const noexcept;
+```
+
+Copies the UTF-16 encoding of the stored scalar value into `out` and returns the number of written code units.
+
+Constraints:
+
+- `CharT` is an integral type
+- `CharT` is not `bool`
+- `char16_t` is convertible to `CharT`
+- `OutIt` models `std::output_iterator<OutIt, CharT>`
+
+Example:
+
+```cpp
+std::array<char16_t, 2> buffer{};
+const auto n = "😀"_u8c.encode_utf16<char16_t>(buffer.begin());
+
+assert(n == 2);
+assert(buffer[0] == static_cast<char16_t>(0xD83D));
+assert(buffer[1] == static_cast<char16_t>(0xDE00));
+```
+
 ### Increment and decrement
 
 `utf8_char` supports direct scalar stepping:
@@ -574,6 +608,234 @@ constexpr void swap(utf8_char& other) noexcept;
 ```
 
 Swaps two values.
+
+## Reference: utf16_char
+
+### Overview
+
+`utf16_char` is the UTF-16-native peer of `utf8_char`.
+
+It stores one Unicode scalar value as one or two UTF-16 code units and is guaranteed to represent exactly one valid UTF-16 encoded character.
+
+Use `utf16_char` when:
+
+- your source data is naturally UTF-16
+- you want a scalar value type that preserves UTF-16-native storage
+- you need to emit UTF-16 without re-deriving surrogate pairs by hand
+
+Compared to `utf8_char`, the main differences are:
+
+- the stored representation is UTF-16 code units rather than UTF-8 bytes
+- the size query is `code_unit_count()` rather than `byte_count()`
+- construction is from UTF-16 code units rather than UTF-8 bytes
+- it does not expose `as_utf8_view()`, because there is no `utf16_string_view` type yet
+
+It supports:
+
+- checked and unchecked scalar construction
+- checked and unchecked UTF-16 code-unit construction
+- conversion back to scalar value
+- UTF-8 and UTF-16 emission
+- direct increment and decrement across Unicode scalar values
+- ASCII-only and Unicode-aware classification
+- ASCII-only transforms
+- comparison, formatting, streaming, hashing
+
+### Synopsis
+
+```cpp
+struct utf16_char
+{
+    utf16_char() = default;
+
+    static const utf16_char replacement_character;
+    static const utf16_char null_terminator;
+
+    static constexpr std::optional<utf16_char> from_scalar(std::uint32_t scalar) noexcept;
+    static constexpr utf16_char from_scalar_unchecked(std::uint32_t scalar) noexcept;
+
+    template<class CharT>
+    static constexpr std::optional<utf16_char> from_utf16_code_units(
+        const CharT* code_units, std::size_t size) noexcept;
+
+    template<class CharT>
+    static constexpr utf16_char from_utf16_code_units_unchecked(
+        const CharT* code_units, std::size_t size) noexcept;
+
+    constexpr std::uint32_t as_scalar() const noexcept;
+    constexpr std::u16string_view as_view() const noexcept;
+    constexpr operator std::u16string_view() const noexcept;
+
+    constexpr utf16_char& operator++() noexcept;
+    constexpr utf16_char operator++(int) noexcept;
+    constexpr utf16_char& operator--() noexcept;
+    constexpr utf16_char operator--(int) noexcept;
+
+    constexpr bool is_ascii() const noexcept;
+    constexpr bool is_alphabetic() const noexcept;
+    constexpr bool is_alphanumeric() const noexcept;
+    constexpr bool is_ascii_alphabetic() const noexcept;
+    constexpr bool is_ascii_alphanumeric() const noexcept;
+    constexpr bool is_ascii_control() const noexcept;
+    constexpr bool is_ascii_digit() const noexcept;
+    constexpr bool is_ascii_graphic() const noexcept;
+    constexpr bool is_ascii_hexdigit() const noexcept;
+    constexpr bool is_ascii_lowercase() const noexcept;
+    constexpr bool is_ascii_octdigit() const noexcept;
+    constexpr bool is_ascii_punctuation() const noexcept;
+    constexpr bool is_ascii_uppercase() const noexcept;
+    constexpr bool is_ascii_whitespace() const noexcept;
+    constexpr bool is_control() const noexcept;
+    constexpr bool is_digit() const noexcept;
+    constexpr bool is_lowercase() const noexcept;
+    constexpr bool is_numeric() const noexcept;
+    constexpr bool is_uppercase() const noexcept;
+    constexpr bool is_whitespace() const noexcept;
+
+    constexpr utf16_char ascii_lowercase() const noexcept;
+    constexpr utf16_char ascii_uppercase() const noexcept;
+    constexpr bool eq_ignore_ascii_case(utf16_char other) const noexcept;
+    constexpr void swap(utf16_char& other) noexcept;
+
+    constexpr std::size_t code_unit_count() const noexcept;
+
+    template<class CharT, class OutIt>
+    constexpr std::size_t encode_utf16(OutIt out) const noexcept;
+
+    template<class CharT, class OutIt>
+    constexpr std::size_t encode_utf8(OutIt out) const noexcept;
+};
+```
+
+### Construction
+
+#### `from_scalar`
+
+```cpp
+static constexpr std::optional<utf16_char> from_scalar(std::uint32_t scalar) noexcept;
+```
+
+Constructs from a Unicode scalar value.
+
+If `scalar` is not a valid Unicode scalar value, the result is `std::nullopt`.
+
+Examples:
+
+```cpp
+static_assert(utf16_char::from_scalar(0x20ACu).has_value());
+static_assert(!utf16_char::from_scalar(0x110000u).has_value());
+```
+
+#### `from_utf16_code_units`
+
+```cpp
+template<class CharT>
+static constexpr std::optional<utf16_char> from_utf16_code_units(
+    const CharT* code_units, std::size_t size) noexcept;
+```
+
+Constructs from one valid UTF-16 scalar encoded as one code unit or one surrogate pair.
+
+Examples:
+
+```cpp
+static_assert(utf16_char::from_utf16_code_units(u"€", 1).has_value());
+static_assert(!utf16_char::from_utf16_code_units(u"\xD800", 1).has_value());
+```
+
+For compile-time construction from UTF-16 source text, prefer the `_u16c` literal:
+
+```cpp
+constexpr utf16_char euro = u"€"_u16c;
+constexpr utf16_char grinning = u"😀"_u16c;
+```
+
+### Conversion and observation
+
+#### `as_scalar`
+
+```cpp
+constexpr std::uint32_t as_scalar() const noexcept;
+```
+
+Returns the Unicode scalar value represented by this character.
+
+#### `as_view`
+
+```cpp
+constexpr std::u16string_view as_view() const noexcept;
+```
+
+Returns a `std::u16string_view` over the stored UTF-16 code units.
+
+#### `code_unit_count`
+
+```cpp
+constexpr std::size_t code_unit_count() const noexcept;
+```
+
+Returns `1` for BMP scalars and `2` for supplementary scalars.
+
+Examples:
+
+```cpp
+static_assert(u"€"_u16c.code_unit_count() == 1);
+static_assert(u"😀"_u16c.code_unit_count() == 2);
+```
+
+### Encoding
+
+#### `encode_utf16`
+
+```cpp
+template<class CharT, class OutIt>
+constexpr std::size_t encode_utf16(OutIt out) const noexcept;
+```
+
+Copies the stored UTF-16 code units into `out` and returns the number of written code units.
+
+`CharT` must accept `char16_t` without narrowing.
+
+#### `encode_utf8`
+
+```cpp
+template<class CharT, class OutIt>
+constexpr std::size_t encode_utf8(OutIt out) const noexcept;
+```
+
+Encodes the stored scalar as UTF-8 and writes it to `out`.
+
+Examples:
+
+```cpp
+std::array<char16_t, 2> utf16_buffer{};
+assert(u"😀"_u16c.encode_utf16<char16_t>(utf16_buffer.begin()) == 2);
+
+std::array<char, 4> utf8_buffer{};
+assert(u"€"_u16c.encode_utf8<char>(utf8_buffer.begin()) == 3);
+```
+
+### Increment, decrement, and classification
+
+`utf16_char` follows the same scalar-stepping and classification rules as `utf8_char`:
+
+- `++` and `--` move across Unicode scalar values
+- surrogate code points are skipped
+- ASCII predicates are exact and cheap
+- Unicode predicates use the generated Unicode property tables
+
+Examples:
+
+```cpp
+utf16_char ch = u"A"_u16c;
+++ch;
+assert(ch == u"B"_u16c);
+
+assert(u"Ω"_u16c.is_alphabetic());
+assert(u"Ω"_u16c.is_uppercase());
+assert(u"ω"_u16c.is_lowercase());
+assert(u"A"_u16c.eq_ignore_ascii_case(u"a"_u16c));
+```
 
 ## Reference: utf8_string_view
 
@@ -1113,6 +1375,8 @@ std::basic_string<char8_t, std::char_traits<char8_t>, Allocator>
 
 It shares the same read-only API as `utf8_string_view`.
 
+`utf8_string` also compares lexicographically by the underlying UTF-8 bytes, and it can be compared directly with `utf8_string_view`.
+
 ### Synopsis
 
 ```cpp
@@ -1203,10 +1467,30 @@ public:
     constexpr void push_back(utf8_char ch);
     constexpr void swap(basic_utf8_string& other) noexcept(...);
 
-    friend constexpr basic_utf8_string operator+(basic_utf8_string lhs, utf8_string_view rhs);
-    friend constexpr basic_utf8_string operator+(utf8_string_view lhs, basic_utf8_string rhs);
-    friend constexpr basic_utf8_string operator+(basic_utf8_string lhs, utf8_char rhs);
-    friend constexpr basic_utf8_string operator+(utf8_char lhs, basic_utf8_string rhs);
+    friend constexpr basic_utf8_string operator+(const basic_utf8_string& lhs,
+                                                 const basic_utf8_string& rhs);
+    friend constexpr basic_utf8_string operator+(basic_utf8_string&& lhs,
+                                                 const basic_utf8_string& rhs);
+    friend constexpr basic_utf8_string operator+(const basic_utf8_string& lhs,
+                                                 basic_utf8_string&& rhs);
+    friend constexpr basic_utf8_string operator+(basic_utf8_string&& lhs,
+                                                 basic_utf8_string&& rhs);
+    friend constexpr basic_utf8_string operator+(const basic_utf8_string& lhs,
+                                                 utf8_string_view rhs);
+    friend constexpr basic_utf8_string operator+(basic_utf8_string&& lhs,
+                                                 utf8_string_view rhs);
+    friend constexpr basic_utf8_string operator+(utf8_string_view lhs,
+                                                 const basic_utf8_string& rhs);
+    friend constexpr basic_utf8_string operator+(utf8_string_view lhs,
+                                                 basic_utf8_string&& rhs);
+    friend constexpr basic_utf8_string operator+(const basic_utf8_string& lhs,
+                                                 utf8_char rhs);
+    friend constexpr basic_utf8_string operator+(basic_utf8_string&& lhs,
+                                                 utf8_char rhs);
+    friend constexpr basic_utf8_string operator+(utf8_char lhs,
+                                                 const basic_utf8_string& rhs);
+    friend constexpr basic_utf8_string operator+(utf8_char lhs,
+                                                 basic_utf8_string&& rhs);
 };
 ```
 
@@ -1376,7 +1660,7 @@ Example:
 using namespace utf8_ranges;
 using namespace utf8_ranges::literals;
 
-utf8_string s{ "Aé€"_utf8_sv };
+utf8_string s = "Aé€"_utf8_s;
 s.push_back("!"_u8c);
 s.erase(1, 2); // removes "é"
 s.replace(1, "Ω"_u8c); // replaces '€' with 'Ω'
@@ -1388,6 +1672,11 @@ assert(s.ends_with("!"_u8c));
 ```
 
 ## Reference: views
+
+The view types are split by encoding:
+
+- UTF-8 views are declared in `utf8_ranges/utf8_views.hpp`
+- UTF-16 views are declared in `utf8_ranges/utf16_views.hpp`
 
 ### `utf8_ranges::views::utf8_view`
 
@@ -1460,6 +1749,46 @@ for (utf8_char ch : input | views::lossy_utf8)
 assert(decoded == "A\xEF\xBF\xBD\xEF\xBF\xBD(\xEF\xBF\xBD");
 ```
 
+### `utf8_ranges::views::lossy_utf16_view<CharT>`
+
+Lossy forward view over arbitrary UTF-16 code units.
+
+Construction:
+
+```cpp
+constexpr lossy_utf16_view(std::basic_string_view<CharT> base) noexcept;
+```
+
+Semantics:
+
+- valid UTF-16 code unit sequences are decoded into `utf16_char`
+- malformed input yields `utf16_char::replacement_character`
+- the iterator advances by two code units for a valid surrogate pair, otherwise by one code unit
+
+### `utf8_ranges::views::lossy_utf16`
+
+Adaptor closure for `lossy_utf16_view`.
+
+Example:
+
+```cpp
+const std::u16string input{
+    static_cast<char16_t>(u'A'),
+    static_cast<char16_t>(0xD800), // invalid lone high surrogate
+    static_cast<char16_t>(u'B'),
+    static_cast<char16_t>(0xD83D),
+    static_cast<char16_t>(0xDE00)  // 😀
+};
+
+std::string decoded;
+for (utf16_char ch : input | views::lossy_utf16)
+{
+    ch.encode_utf8<char>(std::back_inserter(decoded));
+}
+
+assert(decoded == "A\xEF\xBF\xBD" "B\xF0\x9F\x98\x80");
+```
+
 ## Reference: literals
 
 ### `operator ""_u8c`
@@ -1499,7 +1828,7 @@ constexpr auto b = "Aé€"_utf8_sv;
 
 Constructs a `utf8_string` from a UTF-8 string literal.
 
-Validation is performed at compile time.
+The literal contents are validated before the owning string is produced.
 
 Example:
 
@@ -1519,6 +1848,7 @@ Supported:
 - `std::ostream << utf8_char`
 - `std::hash<utf8_char>`
 - `std::formatter<utf8_char, char>`
+- `std::formatter<utf8_char, wchar_t>`
 
 Formatting supports character presentation and scalar numeric presentation.
 
@@ -1531,6 +1861,26 @@ assert(std::format("{:>4c}", "€"_u8c) == "   €");
 assert(std::format("{:*^5c}", "é"_u8c) == "**é**");
 assert(std::format("{:#06x}", "A"_u8c) == "0x0041");
 assert(std::format("{:#010b}", "A"_u8c) == "0b01000001");
+assert(std::format(L"{}", "€"_u8c) == L"€");
+```
+
+### `utf16_char`
+
+Supported:
+
+- `std::ostream << utf16_char`
+- `std::hash<utf16_char>`
+- `std::formatter<utf16_char, char>`
+- `std::formatter<utf16_char, wchar_t>`
+
+Formatting follows the same character and scalar numeric presentation rules as `utf8_char`.
+
+Examples:
+
+```cpp
+assert(std::format("{}", u"€"_u16c) == "€");
+assert(std::format("{:x}", u"€"_u16c) == "20ac");
+assert(std::format(L"{}", u"😀"_u16c) == L"😀");
 ```
 
 ### `utf8_string_view`

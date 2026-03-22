@@ -20,19 +20,29 @@ tracking local work before it is tagged or versioned.
 - `utf8_string::replace_with_range(pos, count, range)`
 - `utf8_string::replace_with_range(pos, range)`
 - `utf8_string::operator+` with `utf8_string_view` and `utf8_char`
+- `utf8_string` / `utf8_string_view` mixed `operator==` and `operator<=>`
+- `operator ""_utf8_s` for owning UTF-8 string literals
 - `utf8_string_view::char_at_unchecked(index)`
 - `utf8_string_view::find(...)` and `rfind(...)` overloads for `char8_t`, `utf8_char`, and `utf8_string_view`
 - `utf8_string_view::ceil_char_boundary(...)` and `floor_char_boundary(...)`
 - `std::uses_allocator` specialization for `utf8_string`
+- `utf8_char::encode_utf16(...)`
+- `utf16_char`
+- `utf8_ranges::views::lossy_utf16_view`
+- `utf8_ranges::views::lossy_utf16`
+- `std::formatter<utf8_char, wchar_t>`
+- `std::formatter<utf16_char, wchar_t>`
 
 ### Changed
 
 - `utf8_string_view::char_at(index)` now interprets `index` as a byte index and returns `std::nullopt` when the index is out of range or not a UTF-8 character boundary
 - `utf8_string` is now an alias for `basic_utf8_string<>`, which lets `std::ranges::to<utf8_string>()` work naturally
 - library headers now use ordinary include guards instead of `#pragma once`
+- UTF-8 views now live in `utf8_views.hpp`, and UTF-16 views live in `utf16_views.hpp`
 - tests and documentation now prefer direct Unicode literals instead of `u8`-prefixed literals where possible
 
 ### Documentation
 
 - expanded the `utf8_string_view` reference for `char_at` and `char_at_unchecked`
 - documented the `utf8_string` mutation APIs, including `assign`, `insert`, `erase`, `replace`, `replace_with_range`, `operator+`, and `get_allocator`
+- added documentation for `utf16_char`, `lossy_utf16_view`, and the `_utf8_s` literal

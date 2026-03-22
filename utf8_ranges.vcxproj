@@ -139,9 +139,11 @@
     <ClInclude Include="utf8_ranges\string.hpp" />
     <ClInclude Include="utf8_ranges\unicode_tables.hpp" />
     <ClInclude Include="utf8_ranges_tests.hpp" />
+    <ClInclude Include="utf8_ranges\utf16_char.hpp" />
     <ClInclude Include="utf8_ranges\utf8_char.hpp" />
     <ClInclude Include="utf8_ranges.hpp" />
-    <ClInclude Include="utf8_ranges\views.hpp" />
+    <ClInclude Include="utf8_ranges\utf16_views.hpp" />
+    <ClInclude Include="utf8_ranges\utf8_views.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source.cpp" />

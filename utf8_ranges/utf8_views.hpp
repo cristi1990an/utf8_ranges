@@ -1,5 +1,5 @@
-#ifndef UTF8_RANGES_VIEWS_HPP
-#define UTF8_RANGES_VIEWS_HPP
+#ifndef UTF8_RANGES_UTF8_VIEWS_HPP
+#define UTF8_RANGES_UTF8_VIEWS_HPP
 
 #include "utf8_char.hpp"
 
@@ -344,4 +344,4 @@ namespace views
 
 }
 
-#endif // UTF8_RANGES_VIEWS_HPP
+#endif // UTF8_RANGES_UTF8_VIEWS_HPP

@@ -30,10 +30,16 @@
     <ClInclude Include="utf8_ranges\utf8_char.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="utf8_ranges\utf16_char.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="utf8_ranges.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="utf8_ranges\views.hpp">
+    <ClInclude Include="utf8_ranges\utf16_views.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="utf8_ranges\utf8_views.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

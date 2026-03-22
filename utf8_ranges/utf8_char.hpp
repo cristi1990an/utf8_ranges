@@ -601,6 +601,26 @@ public:
 		return text.size();
 	}
 
+	template<typename CharT, typename OutIt>
+	requires (std::is_integral_v<CharT>
+		&& !std::is_same_v<CharT, bool>
+		&& details::non_narrowing_convertible<char16_t, CharT>
+		&& std::output_iterator<OutIt, CharT>)
+	constexpr std::size_t encode_utf16(OutIt out) const noexcept
+	{
+		const auto scalar = as_scalar();
+		if (scalar <= 0xFFFFu)
+		{
+			*out++ = static_cast<CharT>(scalar);
+			return 1;
+		}
+
+		const auto shifted = scalar - 0x10000u;
+		*out++ = static_cast<CharT>(0xD800u + (shifted >> 10));
+		*out++ = static_cast<CharT>(0xDC00u + (shifted & 0x3FFu));
+		return 2;
+	}
+
 	friend constexpr bool operator==(const utf8_char&, const utf8_char&) = default;
 	friend constexpr auto operator<=>(const utf8_char&, const utf8_char&) = default;
 
@@ -829,6 +849,91 @@ namespace std
 			std::array<char, 4> buffer{};
 			const auto len = value.encode_utf8<char>(buffer.begin());
 			const std::string_view text{ buffer.data(), len };
+			return text_formatter_.format(text, ctx);
+		}
+	};
+
+	template<>
+	struct formatter<utf8_ranges::utf8_char, wchar_t>
+	{
+		static constexpr std::size_t max_spec_size = 64;
+
+		static constexpr bool is_numeric_presentation(wchar_t c) noexcept
+		{
+			return c == L'd' || c == L'b' || c == L'B' || c == L'o' || c == L'x' || c == L'X';
+		}
+
+		static constexpr bool is_ascii_alpha(wchar_t c) noexcept
+		{
+			return (c >= L'a' && c <= L'z') || (c >= L'A' && c <= L'Z');
+		}
+
+		std::array<wchar_t, max_spec_size> spec_{};
+		std::size_t spec_len_ = 0;
+		wchar_t presentation_ = L'\0';
+		bool use_numeric_formatter_ = false;
+		std::formatter<std::wstring_view, wchar_t> text_formatter_{};
+		std::formatter<std::uint32_t, wchar_t> numeric_formatter_{};
+
+		constexpr auto parse(std::wformat_parse_context& ctx)
+		{
+			auto it = ctx.begin();
+			auto end = ctx.end();
+			while (it != end && *it != L'}')
+			{
+				if (spec_len_ >= max_spec_size) [[unlikely]]
+				{
+					throw std::format_error("utf8_char format specifier is too long");
+				}
+				spec_[spec_len_++] = *it++;
+			}
+
+			if (it == end) [[unlikely]]
+			{
+				throw std::format_error("missing closing brace in utf8_char format specifier");
+			}
+
+			if (spec_len_ > 0 && is_ascii_alpha(spec_[spec_len_ - 1]))
+			{
+				presentation_ = spec_[spec_len_ - 1];
+			}
+
+			if (presentation_ != L'\0' && presentation_ != L'c' && !is_numeric_presentation(presentation_)) [[unlikely]]
+			{
+				throw std::format_error("unsupported utf8_char presentation type");
+			}
+
+			use_numeric_formatter_ = is_numeric_presentation(presentation_);
+			if (use_numeric_formatter_)
+			{
+				std::wformat_parse_context numeric_ctx{ std::wstring_view{ spec_.data(), spec_len_ } };
+				(void)numeric_formatter_.parse(numeric_ctx);
+			}
+			else
+			{
+				std::array<wchar_t, max_spec_size> text_spec = spec_;
+				if (presentation_ == L'c')
+				{
+					text_spec[spec_len_ - 1] = L's';
+				}
+				std::wformat_parse_context text_ctx{ std::wstring_view{ text_spec.data(), spec_len_ } };
+				(void)text_formatter_.parse(text_ctx);
+			}
+
+			return it;
+		}
+
+		template<typename FormatContext>
+		auto format(const utf8_ranges::utf8_char& value, FormatContext& ctx) const
+		{
+			if (use_numeric_formatter_) [[unlikely]]
+			{
+				return numeric_formatter_.format(value.as_scalar(), ctx);
+			}
+
+			std::array<wchar_t, 2> buffer{};
+			const auto len = utf8_ranges::details::encode_unicode_scalar_wchar_unchecked(value.as_scalar(), buffer.data());
+			const std::wstring_view text{ buffer.data(), len };
 			return text_formatter_.format(text, ctx);
 		}
 	};
