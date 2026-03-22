@@ -15,7 +15,7 @@ using namespace utf8_ranges::literals;
 
 inline void run_utf8_ranges_tests()
 {
-	const auto wide_from_scalar = [](std::uint32_t scalar)
+	[[maybe_unused]] const auto wide_from_scalar = [](std::uint32_t scalar)
 	{
 		std::wstring result;
 		if constexpr (sizeof(wchar_t) == 2)
@@ -37,6 +37,18 @@ inline void run_utf8_ranges_tests()
 		}
 
 		return result;
+	};
+	const auto expect_out_of_range = [](auto&& fn)
+	{
+		try
+		{
+			std::forward<decltype(fn)>(fn)();
+			return false;
+		}
+		catch (const std::out_of_range&)
+		{
+			return true;
+		}
 	};
 	constexpr utf8_char latin1_ch = "é"_u8c;
 	constexpr auto utf8_text = "Aé€"_utf8_sv;
@@ -259,7 +271,7 @@ inline void run_utf8_ranges_tests()
 
 	{
 		std::u16string encoded;
-		const auto n = "😀"_u8c.encode_utf16<char16_t>(std::back_inserter(encoded));
+		[[maybe_unused]] const auto n = "😀"_u8c.encode_utf16<char16_t>(std::back_inserter(encoded));
 		assert(n == 2);
 		assert(encoded.size() == 2);
 		assert(encoded[0] == static_cast<char16_t>(0xD83Du));
@@ -281,7 +293,7 @@ inline void run_utf8_ranges_tests()
 	assert(std::format(L"{:x}", u"€"_u16c) == L"20ac");
 	{
 		std::array<char16_t, 2> encoded{};
-		const auto n = u"😀"_u16c.encode_utf16<char16_t>(encoded.begin());
+		[[maybe_unused]] const auto n = u"😀"_u16c.encode_utf16<char16_t>(encoded.begin());
 		assert(n == 2);
 		assert(encoded[0] == static_cast<char16_t>(0xD83Du));
 		assert(encoded[1] == static_cast<char16_t>(0xDE00u));
@@ -289,7 +301,7 @@ inline void run_utf8_ranges_tests()
 
 	{
 		constexpr std::u16string_view text = u"Aé😀";
-		const auto view = views::utf16_view::from_code_units_unchecked(text);
+		[[maybe_unused]] const auto view = views::utf16_view::from_code_units_unchecked(text);
 		assert(std::ranges::equal(view, std::array{ u"A"_u16c, u"é"_u16c, u"😀"_u16c }));
 	}
 	{
@@ -303,7 +315,7 @@ inline void run_utf8_ranges_tests()
 	}
 	{
 		constexpr std::u16string_view text = u"Aé😀";
-		const auto view = views::reversed_utf16_view::from_code_units_unchecked(text);
+		[[maybe_unused]] const auto view = views::reversed_utf16_view::from_code_units_unchecked(text);
 		assert(std::ranges::equal(view, std::array{ u"😀"_u16c, u"é"_u16c, u"A"_u16c }));
 	}
 	{
@@ -434,133 +446,73 @@ inline void run_utf8_ranges_tests()
 	}
 	{
 		utf8_string s{ utf8_text };
-		bool threw = false;
-		try
+		if (!expect_out_of_range([&] { s.erase(decltype(s)::npos); }))
 		{
-			s.erase(decltype(s)::npos);
+			assert(false);
 		}
-		catch (const std::out_of_range&)
-		{
-			threw = true;
-		}
-		assert(threw);
 	}
 	{
 		utf8_string s{ utf8_text };
-		bool threw = false;
-		try
+		if (!expect_out_of_range([&] { s.erase(2, 1); }))
 		{
-			s.erase(2, 1);
+			assert(false);
 		}
-		catch (const std::out_of_range&)
-		{
-			threw = true;
-		}
-		assert(threw);
 	}
 	{
 		utf8_string s{ utf8_text };
-		bool threw = false;
-		try
+		if (!expect_out_of_range([&] { s.erase(1, 1); }))
 		{
-			s.erase(1, 1);
+			assert(false);
 		}
-		catch (const std::out_of_range&)
-		{
-			threw = true;
-		}
-		assert(threw);
 	}
 	{
 		utf8_string s{ utf8_text };
-		bool threw = false;
-		try
+		if (!expect_out_of_range([&] { s.replace(decltype(s)::npos, 1, "Ω"_utf8_sv); }))
 		{
-			s.replace(decltype(s)::npos, 1, "Ω"_utf8_sv);
+			assert(false);
 		}
-		catch (const std::out_of_range&)
-		{
-			threw = true;
-		}
-		assert(threw);
 	}
 	{
 		utf8_string s{ utf8_text };
-		bool threw = false;
-		try
+		if (!expect_out_of_range([&] { s.replace(2, 1, "Ω"_utf8_sv); }))
 		{
-			s.replace(2, 1, "Ω"_utf8_sv);
+			assert(false);
 		}
-		catch (const std::out_of_range&)
-		{
-			threw = true;
-		}
-		assert(threw);
 	}
 	{
 		utf8_string s{ utf8_text };
-		bool threw = false;
-		try
+		if (!expect_out_of_range([&] { s.replace(1, 1, "Ω"_utf8_sv); }))
 		{
-			s.replace(1, 1, "Ω"_utf8_sv);
+			assert(false);
 		}
-		catch (const std::out_of_range&)
-		{
-			threw = true;
-		}
-		assert(threw);
 	}
 	{
 		utf8_string s{ utf8_text };
-		bool threw = false;
-		try
+		if (!expect_out_of_range([&] { s.replace(s.size(), "Ω"_utf8_sv); }))
 		{
-			s.replace(s.size(), "Ω"_utf8_sv);
+			assert(false);
 		}
-		catch (const std::out_of_range&)
-		{
-			threw = true;
-		}
-		assert(threw);
 	}
 	{
 		utf8_string s{ utf8_text };
-		bool threw = false;
-		try
+		if (!expect_out_of_range([&] { s.replace(2, "Ω"_u8c); }))
 		{
-			s.replace(2, "Ω"_u8c);
+			assert(false);
 		}
-		catch (const std::out_of_range&)
-		{
-			threw = true;
-		}
-		assert(threw);
 	}
 	{
 		utf8_string s{ utf8_text };
-		bool threw = false;
-		try
+		if (!expect_out_of_range([&] { s.replace_with_range(decltype(s)::npos, 1, std::array{ "Ω"_u8c }); }))
 		{
-			s.replace_with_range(decltype(s)::npos, 1, std::array{ "Ω"_u8c });
+			assert(false);
 		}
-		catch (const std::out_of_range&)
-		{
-			threw = true;
-		}
-		assert(threw);
 	}
 	{
 		utf8_string s{ utf8_text };
-		bool threw = false;
-		try
+		if (!expect_out_of_range([&] { s.replace_with_range(2, std::array{ "Ω"_u8c }); }))
 		{
-			s.replace_with_range(2, std::array{ "Ω"_u8c });
+			assert(false);
 		}
-		catch (const std::out_of_range&)
-		{
-			threw = true;
-		}
-		assert(threw);
 	}
 
 	assert(std::format("{}", utf8_text) == "A\xC3\xA9\xE2\x82\xAC");
