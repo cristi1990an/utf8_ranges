@@ -78,7 +78,6 @@ The implementation relies on language and library facilities including:
 - `std::format`
 - ranges and views
 - `std::ranges::range_adaptor_closure`
-- `std::views::enumerate`
 
 The following versions are the minimum toolchains currently tested in CI:
 
@@ -88,7 +87,7 @@ The following versions are the minimum toolchains currently tested in CI:
 
 These are minimum tested versions, not guaranteed absolute minimum versions. Older toolchains may work, but are not currently part of the test matrix.
 
-Clang with `libc++` is not currently listed as a supported configuration. As of the current CI setup, `libc++` still does not provide all of the C++23 ranges facilities required by this library, in particular `std::views::enumerate`.
+Clang with `libc++` is not currently listed as a supported configuration. It is simply not part of the current test matrix.
 
 ## Unicode version
 
@@ -1093,14 +1092,12 @@ Complexity:
 constexpr auto char_indices() const noexcept;
 ```
 
-Returns an enumerated view of `chars()`.
+Returns a view of `(byte_offset, utf8_char)` pairs.
 
 Each element is a pair-like value containing:
 
-- the zero-based character index
+- the zero-based byte position of the character in the underlying UTF-8 buffer
 - the corresponding `utf8_char`
-
-The index is a character index, not a byte offset.
 
 Preconditions:
 
@@ -1458,6 +1455,8 @@ That means:
 
 - `size()` returns the number of UTF-16 code units
 - `char_count()` returns the number of Unicode scalar values
+- `char_indices()` returns `(code_unit_offset, utf16_char)` pairs
+- `grapheme_indices()` returns `(code_unit_offset, utf16_string_view)` pairs
 - `find(char16_t, pos)` is a raw code-unit search
 - `find(utf16_char, pos)` and `find(utf16_string_view, pos)` round `pos` up to the next UTF-16 character boundary
 - `rfind(utf16_char, pos)` and `rfind(utf16_string_view, pos)` round `pos` down to a UTF-16 character boundary
@@ -2362,6 +2361,11 @@ Character-oriented:
 - `char_at()`
 - `front()`
 - `back()`
+
+`char_indices()` and `grapheme_indices()` still report underlying buffer positions:
+
+- byte offsets for UTF-8 text
+- code-unit offsets for UTF-16 text
 
 ### 2. Checked versus unchecked APIs
 

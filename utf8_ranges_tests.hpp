@@ -199,15 +199,26 @@ inline void run_utf8_ranges_tests()
 	}());
 	static_assert(u8"e\u0301"_grapheme_utf8 == u8"e\u0301"_utf8_sv);
 	static_assert([] {
+		constexpr auto text = u8"Aé€"_utf8_sv;
+		auto it = text.char_indices().begin();
+		if (it == text.char_indices().end()) return false;
+		const auto [i0, c0] = *it++;
+		if (i0 != 0 || c0 != "A"_u8c) return false;
+		const auto [i1, c1] = *it++;
+		if (i1 != 1 || c1 != "é"_u8c) return false;
+		const auto [i2, c2] = *it++;
+		return i2 == 3 && c2 == "€"_u8c && it == text.char_indices().end();
+	}());
+	static_assert([] {
 		constexpr auto text = u8"e\u0301🇷🇴!"_utf8_sv;
 		auto it = text.grapheme_indices().begin();
 		if (it == text.grapheme_indices().end()) return false;
 		const auto [i0, g0] = *it++;
 		if (i0 != 0 || g0 != u8"e\u0301"_grapheme_utf8) return false;
 		const auto [i1, g1] = *it++;
-		if (i1 != 1 || g1 != u8"🇷🇴"_grapheme_utf8) return false;
+		if (i1 != 3 || g1 != u8"🇷🇴"_grapheme_utf8) return false;
 		const auto [i2, g2] = *it++;
-		return i2 == 2 && g2 == u8"!"_grapheme_utf8 && it == text.grapheme_indices().end();
+		return i2 == 11 && g2 == u8"!"_grapheme_utf8 && it == text.grapheme_indices().end();
 	}());
 
 	// utf16_string_view mirrors the utf8_string_view API, but with UTF-16 code-unit semantics.
@@ -295,15 +306,26 @@ inline void run_utf8_ranges_tests()
 	}());
 	static_assert(u"e\u0301"_grapheme_utf16 == u"e\u0301"_utf16_sv);
 	static_assert([] {
+		constexpr auto text = u"Aé😀"_utf16_sv;
+		auto it = text.char_indices().begin();
+		if (it == text.char_indices().end()) return false;
+		const auto [i0, c0] = *it++;
+		if (i0 != 0 || c0 != u"A"_u16c) return false;
+		const auto [i1, c1] = *it++;
+		if (i1 != 1 || c1 != u"é"_u16c) return false;
+		const auto [i2, c2] = *it++;
+		return i2 == 2 && c2 == u"😀"_u16c && it == text.char_indices().end();
+	}());
+	static_assert([] {
 		constexpr auto text = u"e\u0301🇷🇴!"_utf16_sv;
 		auto it = text.grapheme_indices().begin();
 		if (it == text.grapheme_indices().end()) return false;
 		const auto [i0, g0] = *it++;
 		if (i0 != 0 || g0 != u"e\u0301"_grapheme_utf16) return false;
 		const auto [i1, g1] = *it++;
-		if (i1 != 1 || g1 != u"🇷🇴"_grapheme_utf16) return false;
+		if (i1 != 2 || g1 != u"🇷🇴"_grapheme_utf16) return false;
 		const auto [i2, g2] = *it++;
-		return i2 == 2 && g2 == u"!"_grapheme_utf16 && it == text.grapheme_indices().end();
+		return i2 == 6 && g2 == u"!"_grapheme_utf16 && it == text.grapheme_indices().end();
 	}());
 
 	// utf8_char scalar stepping and UTF-16 encoding edge cases.

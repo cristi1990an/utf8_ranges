@@ -9,6 +9,173 @@ namespace unicode_ranges
 namespace details
 {
 
+class utf16_char_indices_view : public std::ranges::view_interface<utf16_char_indices_view>
+{
+public:
+	static constexpr utf16_char_indices_view from_code_units_unchecked(std::u16string_view base) noexcept
+	{
+		return utf16_char_indices_view{ base };
+	}
+
+	class iterator
+	{
+	public:
+		using iterator_category = std::forward_iterator_tag;
+		using iterator_concept = std::forward_iterator_tag;
+		using value_type = std::pair<std::size_t, utf16_char>;
+		using difference_type = std::ptrdiff_t;
+		using reference = value_type;
+		using pointer = void;
+
+		iterator() = default;
+
+		constexpr iterator(std::u16string_view base, std::size_t current) noexcept
+			: base_(base), current_(current)
+		{}
+
+		constexpr reference operator*() const noexcept
+		{
+			const auto first = static_cast<std::uint16_t>(base_[current_]);
+			const auto count = details::is_utf16_high_surrogate(first) ? 2u : 1u;
+			return { current_, utf16_char::from_utf16_code_units_unchecked(base_.data() + current_, count) };
+		}
+
+		constexpr iterator& operator++() noexcept
+		{
+			const auto first = static_cast<std::uint16_t>(base_[current_]);
+			current_ += details::is_utf16_high_surrogate(first) ? 2u : 1u;
+			return *this;
+		}
+
+		constexpr iterator operator++(int) noexcept
+		{
+			iterator old = *this;
+			++(*this);
+			return old;
+		}
+
+		friend constexpr bool operator==(const iterator& it, std::default_sentinel_t) noexcept
+		{
+			return it.current_ == it.base_.size();
+		}
+
+		friend constexpr bool operator==(std::default_sentinel_t, const iterator& it) noexcept
+		{
+			return it.current_ == it.base_.size();
+		}
+
+	private:
+		std::u16string_view base_{};
+		std::size_t current_ = 0;
+	};
+
+	constexpr iterator begin() const noexcept
+	{
+		return iterator{ base_, 0 };
+	}
+
+	constexpr std::default_sentinel_t end() const noexcept
+	{
+		return std::default_sentinel;
+	}
+
+private:
+	constexpr explicit utf16_char_indices_view(std::u16string_view base) noexcept
+		: base_(base)
+	{}
+
+	std::u16string_view base_{};
+};
+
+template <typename View>
+class utf16_grapheme_indices_view : public std::ranges::view_interface<utf16_grapheme_indices_view<View>>
+{
+public:
+	static constexpr utf16_grapheme_indices_view from_code_units_unchecked(std::u16string_view base) noexcept
+	{
+		return utf16_grapheme_indices_view{ base };
+	}
+
+	class iterator
+	{
+	public:
+		using iterator_category = std::forward_iterator_tag;
+		using iterator_concept = std::forward_iterator_tag;
+		using value_type = std::pair<std::size_t, View>;
+		using difference_type = std::ptrdiff_t;
+		using reference = value_type;
+		using pointer = void;
+
+		iterator() = default;
+
+		constexpr iterator(std::u16string_view base, std::size_t current, std::size_t next) noexcept
+			: base_(base), current_(current), next_(next)
+		{}
+
+		constexpr reference operator*() const noexcept
+		{
+			return value_type{
+				current_,
+				View::from_code_units_unchecked(base_.substr(current_, next_ - current_))
+			};
+		}
+
+		constexpr iterator& operator++() noexcept
+		{
+			current_ = next_;
+			if (current_ != base_.size())
+			{
+				next_ = details::next_grapheme_boundary(base_, current_);
+			}
+			return *this;
+		}
+
+		constexpr iterator operator++(int) noexcept
+		{
+			iterator old = *this;
+			++(*this);
+			return old;
+		}
+
+		friend constexpr bool operator==(const iterator& it, std::default_sentinel_t) noexcept
+		{
+			return it.current_ == it.base_.size();
+		}
+
+		friend constexpr bool operator==(std::default_sentinel_t, const iterator& it) noexcept
+		{
+			return it.current_ == it.base_.size();
+		}
+
+	private:
+		std::u16string_view base_{};
+		std::size_t current_ = 0;
+		std::size_t next_ = 0;
+	};
+
+	constexpr iterator begin() const noexcept
+	{
+		if (base_.empty())
+		{
+			return iterator{ base_, base_.size(), base_.size() };
+		}
+
+		return iterator{ base_, 0, details::next_grapheme_boundary(base_, 0) };
+	}
+
+	constexpr std::default_sentinel_t end() const noexcept
+	{
+		return std::default_sentinel;
+	}
+
+private:
+	constexpr explicit utf16_grapheme_indices_view(std::u16string_view base) noexcept
+		: base_(base)
+	{}
+
+	std::u16string_view base_{};
+};
+
 template <typename Derived, typename View>
 class utf16_string_crtp
 {
@@ -46,12 +213,12 @@ public:
 
 	constexpr auto char_indices() const noexcept
 	{
-		return chars() | std::views::enumerate;
+		return utf16_char_indices_view::from_code_units_unchecked(code_unit_view());
 	}
 
 	constexpr auto grapheme_indices() const noexcept
 	{
-		return graphemes() | std::views::enumerate;
+		return utf16_grapheme_indices_view<View>::from_code_units_unchecked(code_unit_view());
 	}
 
 	constexpr bool contains(utf16_char ch) const noexcept
