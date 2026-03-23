@@ -7,6 +7,7 @@
 #include <cassert>
 #include <format>
 #include <functional>
+#include <memory_resource>
 #include <sstream>
 #include <string>
 
@@ -51,6 +52,13 @@ inline void run_utf8_ranges_tests()
 			return true;
 		}
 	};
+
+	static_assert(std::same_as<
+		pmr::utf8_string,
+		basic_utf8_string<std::pmr::polymorphic_allocator<char8_t>>>);
+	static_assert(std::same_as<
+		pmr::utf16_string,
+		basic_utf16_string<std::pmr::polymorphic_allocator<char16_t>>>);
 	constexpr utf8_char latin1_ch = "é"_u8c;
 	constexpr auto utf8_text = "Aé€"_utf8_sv;
 	constexpr auto utf16_text = u"Aé😀"_utf16_sv;
@@ -198,6 +206,7 @@ inline void run_utf8_ranges_tests()
 		});
 	}());
 	static_assert(u8"e\u0301"_grapheme_utf8 == u8"e\u0301"_utf8_sv);
+	static_assert(u8"Aé😀"_utf8_sv.to_utf16() == u"Aé😀"_utf16_sv);
 	static_assert([] {
 		constexpr auto text = u8"Aé€"_utf8_sv;
 		auto it = text.char_indices().begin();
@@ -219,6 +228,29 @@ inline void run_utf8_ranges_tests()
 		if (i1 != 3 || g1 != u8"🇷🇴"_grapheme_utf8) return false;
 		const auto [i2, g2] = *it++;
 		return i2 == 11 && g2 == u8"!"_grapheme_utf8 && it == text.grapheme_indices().end();
+	}());
+	static_assert([] {
+		constexpr auto text = u8"e\u0301🇷🇴!"_utf8_sv;
+		return text.grapheme_count() == 3
+			&& text.is_grapheme_boundary(0)
+			&& !text.is_grapheme_boundary(1)
+			&& text.is_grapheme_boundary(3)
+			&& !text.is_grapheme_boundary(7)
+			&& text.is_grapheme_boundary(11)
+			&& text.ceil_grapheme_boundary(1) == 3
+			&& text.floor_grapheme_boundary(1) == 0
+			&& text.ceil_grapheme_boundary(7) == 11
+			&& text.floor_grapheme_boundary(7) == 3
+			&& text.grapheme_at(0).has_value()
+			&& text.grapheme_at(0).value() == u8"e\u0301"_grapheme_utf8
+			&& text.grapheme_at(3).has_value()
+			&& text.grapheme_at(3).value() == u8"🇷🇴"_grapheme_utf8
+			&& !text.grapheme_at(1).has_value()
+			&& text.grapheme_substr(3, 8).has_value()
+			&& text.grapheme_substr(3, 8).value() == u8"🇷🇴"_utf8_sv
+			&& text.grapheme_substr(3).has_value()
+			&& text.grapheme_substr(3).value() == u8"🇷🇴!"_utf8_sv
+			&& !text.grapheme_substr(1, 2).has_value();
 	}());
 
 	// utf16_string_view mirrors the utf8_string_view API, but with UTF-16 code-unit semantics.
@@ -305,6 +337,7 @@ inline void run_utf8_ranges_tests()
 		});
 	}());
 	static_assert(u"e\u0301"_grapheme_utf16 == u"e\u0301"_utf16_sv);
+	static_assert(u"Aé😀"_utf16_sv.to_utf8() == u8"Aé😀"_utf8_sv);
 	static_assert([] {
 		constexpr auto text = u"Aé😀"_utf16_sv;
 		auto it = text.char_indices().begin();
@@ -326,6 +359,29 @@ inline void run_utf8_ranges_tests()
 		if (i1 != 2 || g1 != u"🇷🇴"_grapheme_utf16) return false;
 		const auto [i2, g2] = *it++;
 		return i2 == 6 && g2 == u"!"_grapheme_utf16 && it == text.grapheme_indices().end();
+	}());
+	static_assert([] {
+		constexpr auto text = u"e\u0301🇷🇴!"_utf16_sv;
+		return text.grapheme_count() == 3
+			&& text.is_grapheme_boundary(0)
+			&& !text.is_grapheme_boundary(1)
+			&& text.is_grapheme_boundary(2)
+			&& !text.is_grapheme_boundary(5)
+			&& text.is_grapheme_boundary(6)
+			&& text.ceil_grapheme_boundary(1) == 2
+			&& text.floor_grapheme_boundary(1) == 0
+			&& text.ceil_grapheme_boundary(5) == 6
+			&& text.floor_grapheme_boundary(5) == 2
+			&& text.grapheme_at(0).has_value()
+			&& text.grapheme_at(0).value() == u"e\u0301"_grapheme_utf16
+			&& text.grapheme_at(2).has_value()
+			&& text.grapheme_at(2).value() == u"🇷🇴"_grapheme_utf16
+			&& !text.grapheme_at(1).has_value()
+			&& text.grapheme_substr(2, 4).has_value()
+			&& text.grapheme_substr(2, 4).value() == u"🇷🇴"_utf16_sv
+			&& text.grapheme_substr(2).has_value()
+			&& text.grapheme_substr(2).value() == u"🇷🇴!"_utf16_sv
+			&& !text.grapheme_substr(1, 2).has_value();
 	}());
 
 	// utf8_char scalar stepping and UTF-16 encoding edge cases.
@@ -544,6 +600,25 @@ inline void run_utf8_ranges_tests()
 	assert(utf8_string{ utf8_text } == "Aé€"_utf8_s);
 	assert(std::format("{}", utf8_string{ utf8_text }) == "Aé€");
 	{
+		const auto result = utf8_string::from_bytes("Aé😀");
+		assert(result.has_value());
+		assert(result.value() == u8"Aé😀"_utf8_sv);
+	}
+	{
+		const auto result = utf8_string::from_bytes(std::wstring_view{ L"Aé😀" });
+		assert(result.has_value());
+		assert(result.value() == u8"Aé😀"_utf8_sv);
+	}
+	assert(utf8_string{ u8"Aé😀"_utf8_sv }.to_utf16() == u"Aé😀"_utf16_sv);
+	{
+		std::pmr::monotonic_buffer_resource resource;
+		const auto transcoded = utf8_string{ u8"Aé😀"_utf8_sv }.to_utf16(std::pmr::polymorphic_allocator<char16_t>{ &resource });
+		static_assert(std::same_as<
+			std::remove_cvref_t<decltype(transcoded)>,
+			pmr::utf16_string>);
+		assert(transcoded == u"Aé😀"_utf16_sv);
+	}
+	{
 		const auto e_acute = utf8_char::from_scalar_unchecked(0x00E9u);
 		const auto lhs = "A"_utf8_s;
 		const utf8_string rhs(std::from_range, std::array{ e_acute });
@@ -571,13 +646,59 @@ inline void run_utf8_ranges_tests()
 		}));
 	}
 
+	{
+		const auto result = utf8_string::from_bytes("Aé😀", std::allocator<char8_t>{});
+		assert(result.has_value());
+		assert(result.value() == u8"Aé😀"_utf8_sv);
+	}
+	{
+		const auto result = utf8_string::from_bytes(std::wstring_view{ L"Aé😀" }, std::allocator<char8_t>{});
+		assert(result.has_value());
+		assert(result.value() == u8"Aé😀"_utf8_sv);
+	}
+
 	// Owning UTF-16 string construction, concatenation, and mutation coverage.
+	{
+		const auto result = utf16_string::from_bytes("Aé😀", std::allocator<char16_t>{});
+		assert(result.has_value());
+		assert(result.value() == u"Aé😀"_utf16_sv);
+	}
+	{
+		const auto result = utf16_string::from_bytes(std::wstring_view{ L"Aé😀" }, std::allocator<char16_t>{});
+		assert(result.has_value());
+		assert(result.value() == u"Aé😀"_utf16_sv);
+	}
+	{
+		const auto result = utf16_string::from_code_units_unchecked(
+			std::u16string{ u"Aé😀" },
+			std::allocator<char16_t>{});
+		assert(result == u"Aé😀"_utf16_sv);
+	}
 	assert(utf16_string{}.base().empty());
 	static_assert(std::same_as<utf16_string::value_type, utf16_char>);
 	static_assert(std::same_as<decltype(utf16_string{}.get_allocator()), std::allocator<char16_t>>);
 	assert(u"Aé😀"_utf16_s == utf16_text);
 	assert(utf16_string{ utf16_text } == u"Aé😀"_utf16_s);
 	assert(std::format("{}", utf16_string{ utf16_text }) == "Aé😀");
+	{
+		const auto result = utf16_string::from_bytes("Aé😀");
+		assert(result.has_value());
+		assert(result.value() == u"Aé😀"_utf16_sv);
+	}
+	{
+		const auto result = utf16_string::from_bytes(std::wstring_view{ L"Aé😀" });
+		assert(result.has_value());
+		assert(result.value() == u"Aé😀"_utf16_sv);
+	}
+	assert(utf16_string{ u"Aé😀"_utf16_sv }.to_utf8() == u8"Aé😀"_utf8_sv);
+	{
+		std::pmr::monotonic_buffer_resource resource;
+		const auto transcoded = utf16_string{ u"Aé😀"_utf16_sv }.to_utf8(std::pmr::polymorphic_allocator<char8_t>{ &resource });
+		static_assert(std::same_as<
+			std::remove_cvref_t<decltype(transcoded)>,
+			pmr::utf8_string>);
+		assert(transcoded == u8"Aé😀"_utf8_sv);
+	}
 	{
 		const auto e_acute = utf16_char::from_scalar_unchecked(0x00E9u);
 		const auto lhs = u"A"_utf16_s;
@@ -820,7 +941,18 @@ inline void run_utf8_ranges_tests()
 			assert(false);
 		}
 	}
-
+	{
+		const auto result = utf8_string::from_bytes(std::string_view{ "A\xFF", 2 });
+		assert(!result.has_value());
+		assert(result.error().code == utf8_error_code::invalid_lead_byte);
+		assert(result.error().first_invalid_byte_index == 1);
+	}
+	{
+		const auto result = utf16_string::from_bytes(std::string_view{ "A\xFF", 2 });
+		assert(!result.has_value());
+		assert(result.error().code == utf8_error_code::invalid_lead_byte);
+		assert(result.error().first_invalid_byte_index == 1);
+	}
 	// Formatting, hashing, and stream insertion for borrowed and owning strings.
 	assert(std::format("{}", utf8_text) == "Aé€");
 	assert(std::format("{}", utf16_text) == "Aé😀");

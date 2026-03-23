@@ -20,6 +20,41 @@ public:
 	using difference_type = std::ptrdiff_t;
 	static constexpr size_type npos = static_cast<size_type>(-1);
 
+	static constexpr auto from_bytes(std::string_view bytes, const Allocator& alloc = Allocator()) noexcept
+		-> std::expected<basic_utf16_string, utf8_error>
+	{
+		if (auto validation = details::validate_utf8(bytes); !validation) [[unlikely]]
+		{
+			return std::unexpected(validation.error());
+		}
+
+		return from_bytes_unchecked(bytes, alloc);
+	}
+
+	static constexpr auto from_bytes(std::wstring_view bytes, const Allocator& alloc = Allocator()) noexcept
+		-> std::expected<basic_utf16_string, utf16_error>
+		requires (sizeof(wchar_t) == 2)
+	{
+		if (auto validation = details::validate_utf16(bytes); !validation) [[unlikely]]
+		{
+			return std::unexpected(validation.error());
+		}
+
+		return from_bytes_unchecked(bytes, alloc);
+	}
+
+	static constexpr auto from_bytes(std::wstring_view bytes, const Allocator& alloc = Allocator()) noexcept
+		-> std::expected<basic_utf16_string, unicode_scalar_error>
+		requires (sizeof(wchar_t) == 4)
+	{
+		if (auto validation = details::validate_unicode_scalars(bytes); !validation) [[unlikely]]
+		{
+			return std::unexpected(validation.error());
+		}
+
+		return from_bytes_unchecked(bytes, alloc);
+	}
+
 	static constexpr basic_utf16_string from_code_units_unchecked(base_type code_units) noexcept
 	{
 		basic_utf16_string result;
@@ -27,12 +62,71 @@ public:
 		return result;
 	}
 
-	static constexpr basic_utf16_string from_code_units_unchecked(equivalent_string_view code_units, Allocator alloc) noexcept
+	static constexpr basic_utf16_string from_code_units_unchecked(base_type code_units, const Allocator& alloc) noexcept
+	{
+		return from_code_units_unchecked(equivalent_string_view{ code_units }, alloc);
+	}
+
+	static constexpr basic_utf16_string from_code_units_unchecked(
+		equivalent_string_view code_units,
+		const Allocator& alloc = Allocator()) noexcept
 	{
 		basic_utf16_string result;
-		result.base_ = base_type{ code_units, std::move(alloc) };
+		result.base_ = base_type{ code_units, alloc };
 		return result;
 	}
+
+private:
+	static constexpr auto from_bytes_unchecked(std::string_view bytes, const Allocator& alloc) noexcept
+		-> basic_utf16_string
+	{
+		base_type utf16_code_units{ alloc };
+		for (std::size_t index = 0; index != bytes.size();)
+		{
+			std::array<char8_t, 4> utf8_bytes{};
+			const auto count = details::utf8_byte_count_from_lead(static_cast<std::uint8_t>(bytes[index]));
+			for (std::size_t i = 0; i != count; ++i)
+			{
+				utf8_bytes[i] = static_cast<char8_t>(bytes[index + i]);
+			}
+
+			const auto scalar = details::decode_valid_utf8_char(std::u8string_view{ utf8_bytes.data(), count });
+			std::array<char16_t, 2> encoded{};
+			const auto encoded_count = details::encode_unicode_scalar_utf16_unchecked(scalar, encoded.data());
+			utf16_code_units.append(encoded.data(), encoded.data() + encoded_count);
+			index += count;
+		}
+
+		return from_code_units_unchecked(std::move(utf16_code_units));
+	}
+
+	static constexpr auto from_bytes_unchecked(std::wstring_view bytes, const Allocator& alloc) noexcept
+		-> basic_utf16_string
+	{
+		if constexpr (sizeof(wchar_t) == 2)
+		{
+			base_type result{ alloc };
+			result.reserve(bytes.size());
+			for (wchar_t ch : bytes)
+			{
+				result.push_back(static_cast<char16_t>(ch));
+			}
+
+			return from_code_units_unchecked(std::move(result));
+		}
+
+		base_type utf16_code_units{ alloc };
+		for (wchar_t ch : bytes)
+		{
+			std::array<char16_t, 2> encoded{};
+			const auto encoded_count = details::encode_unicode_scalar_utf16_unchecked(static_cast<std::uint32_t>(ch), encoded.data());
+			utf16_code_units.append(encoded.data(), encoded.data() + encoded_count);
+		}
+
+		return from_code_units_unchecked(std::move(utf16_code_units));
+	}
+
+public:
 
 	basic_utf16_string() = default;
 	basic_utf16_string(const basic_utf16_string&) = default;
@@ -699,5 +793,8 @@ namespace literals
 }
 
 }
+
+#include "utf8_string.hpp"
+#include "transcoding.hpp"
 
 #endif // UTF8_RANGES_UTF16_STRING_HPP

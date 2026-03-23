@@ -1,38 +1,32 @@
 # unicode_ranges (work in progress)
 
-`unicode_ranges` is a header-only C++ library for representing, validating, iterating, and formatting UTF-8 and UTF-16 text in C++.
+`unicode_ranges` is a header-only C++ library for representing, validating, iterating, and formatting UTF-8 and UTF-16 text.
 
-It provides validated UTF-8 and UTF-16 character, view, string, and range abstractions for modern C++.
+It provides validated UTF-8 and UTF-16 characters, borrowed views, owning strings, and range abstractions for modern C++.
 
-The current public building blocks are:
+## At a glance
 
-- `utf8_char`: one Unicode scalar value stored as its encoded UTF-8 byte sequence, guaranteed to represent a valid UTF-8 character
-- `utf16_char`: one Unicode scalar value stored as its encoded UTF-16 code units, guaranteed to represent a valid UTF-16 character
-- `utf8_string_view`: borrowed UTF-8 byte view, similar to `std::string_view` but guaranteed to represent a valid UTF-8 string slice
-- `utf16_string_view`: borrowed UTF-16 code-unit view, similar to `std::u16string_view` but guaranteed to represent a valid UTF-16 string slice
-- `utf8_string`: an owning UTF-8 string, similar to `std::string` but guaranteed to store valid UTF-8
-- `utf16_string`: an owning UTF-16 string, similar to `std::u16string` but guaranteed to store valid UTF-16
-- `unicode_ranges::views::utf8_view`: lazy iteration over valid UTF-8
-- `unicode_ranges::views::utf16_view`: lazy iteration over valid UTF-16
-- `unicode_ranges::views::reversed_utf8_view`: lazy reverse-order iteration over valid UTF-8
-- `unicode_ranges::views::reversed_utf16_view`: lazy reverse-order iteration over valid UTF-16
-- `unicode_ranges::views::grapheme_cluster_view<CharT>`: lazy default Unicode grapheme segmentation over valid UTF-8 or UTF-16 text
-- `unicode_ranges::views::lossy_utf8_view`: lossy iteration over arbitrary byte sequences
-- `unicode_ranges::views::lossy_utf16_view`: lossy iteration over arbitrary UTF-16 code-unit sequences
+| Category | UTF-8 | UTF-16 |
+| --- | --- | --- |
+| Character | `utf8_char` | `utf16_char` |
+| Borrowed text | `utf8_string_view` | `utf16_string_view` |
+| Owning text | `utf8_string` | `utf16_string` |
+| Forward scalar iteration | `views::utf8_view` | `views::utf16_view` |
+| Reverse scalar iteration | `views::reversed_utf8_view` | `views::reversed_utf16_view` |
+| Grapheme iteration | `views::grapheme_cluster_view<char8_t>` | `views::grapheme_cluster_view<char16_t>` |
+| Lossy iteration | `views::lossy_utf8_view<CharT>` | `views::lossy_utf16_view<CharT>` |
 
-The public entry point is:
+> [!TIP]
+> Public entry point:
+> ```cpp
+> #include "unicode_ranges.hpp"
+> ```
+> All public library types and functions live in namespace `unicode_ranges`.
+> Literal operators live in `unicode_ranges::literals`.
+> PMR owning-string aliases live in `unicode_ranges::pmr`.
 
-```cpp
-#include "unicode_ranges.hpp"
-```
-
-The public umbrella header is named `unicode_ranges.hpp`.
-
-All public library types and functions live in namespace `unicode_ranges`.
-
-Literal operators live in the nested namespace `unicode_ranges::literals`.
-
-The nested namespace `unicode_ranges::details` contains implementation details only. It is not part of the supported public API and should not be used directly by library users.
+> [!WARNING]
+> `unicode_ranges::details` contains implementation details only. It is not part of the supported public API.
 
 ## Contents
 
@@ -65,7 +59,8 @@ This library is built around a few explicit design choices:
 
 In particular, Unicode literals and many core operations are intended to remain usable in constant evaluation.
 
-Default Unicode grapheme segmentation is supported through `graphemes()`, while locale-specific tailoring and higher-level text layout remain out of scope.
+> [!NOTE]
+> Default Unicode grapheme segmentation is supported through `graphemes()`, while locale-specific tailoring and higher-level text layout remain out of scope.
 
 ## Requirements
 
@@ -99,6 +94,9 @@ inline constexpr std::tuple<std::size_t, std::size_t, std::size_t> unicode_versi
 This constant aliases the generated Unicode version used by the Unicode property tables.
 
 Those tables are generated from versioned Unicode data files. In particular, the grapheme-segmentation data is sourced from the official Unicode Character Database rather than inferred from ad-hoc predicates.
+
+> [!IMPORTANT]
+> The checked-in generated tables and the current CI matrix track Unicode `17.0.0`.
 
 The update workflow is:
 
@@ -136,7 +134,7 @@ using namespace unicode_ranges::literals;
 // Compile time validation of UTF-8 string literals.
 constexpr auto text = "café €"_utf8_sv;
 
-// Cheap interoperability with their raw char8_t equivalent.
+// Cheap interoperability with the underlying char8_t view.
 static_assert(text.as_view() == u8"café €");
 
 // `size()` counts UTF-8 code units.
@@ -147,7 +145,7 @@ static_assert(text.as_view() == std::u8string{ 0x63, 0x61, 0x66, 0xC3, 0xA9, 0x2
 static_assert(text.char_count() == 6);
 static_assert(std::ranges::equal(text.chars(), std::array{ "c"_u8c, "a"_u8c, "f"_u8c, "é"_u8c, " "_u8c, "€"_u8c }));
 
-// STL style APIs
+// STL-style APIs.
 static_assert(text.front() == 'c');
 static_assert(text.back() == "€"_u8c);
 
@@ -184,6 +182,42 @@ constexpr utf8_string_view text = "Aé€"_utf8_sv;
 static_assert(euro.code_unit_count() == 3);
 static_assert(text.size() == 6);
 ```
+
+When your source text arrives at runtime as raw bytes, use the owning checked factory:
+
+```cpp
+#include "unicode_ranges.hpp"
+
+#include <fstream>
+#include <iterator>
+#include <print>
+#include <string>
+
+using namespace unicode_ranges;
+
+int main()
+{
+    std::ifstream input("notes.txt", std::ios::binary);
+    std::string raw(
+        std::istreambuf_iterator<char>{ input },
+        std::istreambuf_iterator<char>{});
+
+    auto text = utf8_string::from_bytes(raw);
+    if (!text)
+    {
+        std::println(stderr,
+                     "Invalid UTF-8 at byte {}",
+                     text.error().first_invalid_byte_index);
+        return 1;
+    }
+
+    std::println("Read {} Unicode scalar values", text->char_count());
+    std::println("First character: {}", text->front());
+    std::println("As UTF-16: {}", text->to_utf16());
+}
+```
+
+`from_bytes(std::string_view)` validates the incoming bytes once and returns a validated owning `utf8_string`. The same pattern is available for `utf16_string::from_bytes(...)`, and both owning factories also accept an optional allocator.
 
 Printing and formatting are also supported for the library UTF-8 string types:
 
@@ -227,6 +261,8 @@ int main()
     std::println("{::s}", sv.graphemes()); // [👩‍💻, !]
 }
 ```
+
+`chars()` iterates Unicode scalar values, while `graphemes()` iterates user-perceived characters using the default Unicode grapheme-cluster rules.
 
 ## Error model
 
@@ -946,13 +982,42 @@ public:
 
     static constexpr std::expected<utf8_string_view, utf8_error>
         from_bytes(std::u8string_view bytes) noexcept;
-
     static constexpr utf8_string_view
         from_bytes_unchecked(std::u8string_view bytes) noexcept;
+
+    constexpr auto chars() const noexcept;
+    constexpr auto reversed_chars() const noexcept;
+    constexpr auto graphemes() const noexcept;
+    constexpr auto char_indices() const noexcept;
+    constexpr auto grapheme_indices() const noexcept;
+    constexpr size_type size() const noexcept;
+    constexpr bool empty() const noexcept;
+    constexpr bool is_ascii() const noexcept;
+    constexpr size_type char_count() const noexcept;
+    constexpr size_type grapheme_count() const noexcept;
+    constexpr size_type find(char8_t ch, size_type pos = 0) const noexcept;
+    constexpr size_type find(utf8_char ch, size_type pos = 0) const noexcept;
+    constexpr size_type find(utf8_string_view sv, size_type pos = 0) const noexcept;
+    constexpr size_type rfind(char8_t ch, size_type pos = npos) const noexcept;
+    constexpr size_type rfind(utf8_char ch, size_type pos = npos) const noexcept;
+    constexpr size_type rfind(utf8_string_view sv, size_type pos = npos) const noexcept;
+    constexpr bool is_char_boundary(size_type index) const noexcept;
+    constexpr bool is_grapheme_boundary(size_type index) const noexcept;
+    constexpr size_type ceil_char_boundary(size_type pos) const noexcept;
+    constexpr size_type floor_char_boundary(size_type pos) const noexcept;
+    constexpr size_type ceil_grapheme_boundary(size_type pos) const noexcept;
+    constexpr size_type floor_grapheme_boundary(size_type pos) const noexcept;
+    constexpr std::optional<utf8_char> char_at(size_type index) const noexcept;
+    constexpr std::optional<utf8_string_view> grapheme_at(size_type index) const noexcept;
+    constexpr std::optional<utf8_string_view> substr(size_type pos, size_type count = npos) const noexcept;
+    constexpr std::optional<utf8_string_view> grapheme_substr(size_type pos, size_type count = npos) const noexcept;
 
     constexpr auto base() const noexcept;
     constexpr std::u8string_view as_view() const noexcept;
     constexpr operator std::u8string_view() const noexcept;
+    template<class Allocator = std::allocator<char16_t>>
+    constexpr basic_utf16_string<Allocator>
+        to_utf16(const Allocator& alloc = Allocator()) const;
 };
 ```
 
@@ -1037,6 +1102,21 @@ Complexity:
 - Constant to construct the view
 - Linear to iterate the entire view
 
+#### `graphemes`
+
+```cpp
+constexpr auto graphemes() const noexcept;
+```
+
+Returns a `unicode_ranges::views::grapheme_cluster_view<char8_t>` over the contained text.
+
+Each element is a `utf8_string_view` representing one default Unicode grapheme cluster.
+
+Complexity:
+
+- Constant to construct the view
+- Linear to iterate the entire view
+
 #### `size`
 
 ```cpp
@@ -1107,6 +1187,36 @@ Complexity:
 - Constant to construct the view
 - Linear to iterate the entire view
 
+#### `grapheme_indices`
+
+```cpp
+constexpr auto grapheme_indices() const noexcept;
+```
+
+Returns a view of `(byte_offset, utf8_string_view)` pairs.
+
+Each element contains:
+
+- the zero-based byte position of the grapheme cluster in the underlying UTF-8 buffer
+- the corresponding `utf8_string_view`
+
+Complexity:
+
+- Constant to construct the view
+- Linear to iterate the entire view
+
+#### `grapheme_count`
+
+```cpp
+constexpr size_type grapheme_count() const noexcept;
+```
+
+Returns the number of default Unicode grapheme clusters in the view.
+
+Complexity:
+
+- Linear in the number of grapheme clusters
+
 #### `contains`
 
 ```cpp
@@ -1138,6 +1248,16 @@ The returned index is a byte offset into the underlying UTF-8 sequence.
 For the `char8_t` case, `pos` is treated as a raw byte offset.
 
 For the `utf8_char` and `utf8_string_view` overloads, `pos` is clamped to `size()` and rounded up to the next UTF-8 character boundary before searching.
+
+#### `to_utf16`
+
+```cpp
+template<class Allocator = std::allocator<char16_t>>
+constexpr basic_utf16_string<Allocator>
+    to_utf16(const Allocator& alloc = Allocator()) const;
+```
+
+Materializes the same text as an owning UTF-16 string by transcoding through Unicode scalar values. By default this returns `utf16_string`, but you can supply a different allocator and get `basic_utf16_string<Allocator>`.
 
 Preconditions:
 
@@ -1247,6 +1367,20 @@ Complexity:
 
 - Constant
 
+#### `is_grapheme_boundary`
+
+```cpp
+constexpr bool is_grapheme_boundary(size_type index) const noexcept;
+```
+
+Returns `true` if `index` is a valid grapheme-cluster boundary in the underlying UTF-8 byte sequence.
+
+This function operates on byte indices.
+
+Complexity:
+
+- Linear in the number of grapheme clusters examined
+
 #### `ceil_char_boundary`
 
 ```cpp
@@ -1255,6 +1389,14 @@ constexpr size_type ceil_char_boundary(size_type pos) const noexcept;
 
 Clamps `pos` to `size()` and rounds it up to the next UTF-8 character boundary.
 
+#### `ceil_grapheme_boundary`
+
+```cpp
+constexpr size_type ceil_grapheme_boundary(size_type pos) const noexcept;
+```
+
+Clamps `pos` to `size()` and rounds it up to the next UTF-8 grapheme boundary.
+
 #### `floor_char_boundary`
 
 ```cpp
@@ -1262,6 +1404,14 @@ constexpr size_type floor_char_boundary(size_type pos) const noexcept;
 ```
 
 Clamps `pos` to `size()` and rounds it down to the previous UTF-8 character boundary.
+
+#### `floor_grapheme_boundary`
+
+```cpp
+constexpr size_type floor_grapheme_boundary(size_type pos) const noexcept;
+```
+
+Clamps `pos` to `size()` and rounds it down to the previous UTF-8 grapheme boundary.
 
 #### `char_at_unchecked`
 
@@ -1279,6 +1429,31 @@ Preconditions:
 Complexity:
 
 - Constant
+
+#### `grapheme_at`
+
+```cpp
+constexpr std::optional<utf8_string_view> grapheme_at(size_type index) const noexcept;
+```
+
+Returns the grapheme cluster beginning at byte index `index`.
+
+Returns `std::nullopt` if `index` is out of range or does not name a UTF-8 grapheme boundary.
+
+#### `grapheme_substr`
+
+```cpp
+constexpr std::optional<utf8_string_view>
+    grapheme_substr(size_type pos, size_type count = npos) const noexcept;
+```
+
+Returns a subview starting at byte index `pos`.
+
+If `count == npos`, the returned view extends to the end. Otherwise the end is clamped to `size()`.
+
+`pos` and the computed end position must both be UTF-8 grapheme boundaries. If either is not a grapheme boundary, returns `std::nullopt`.
+
+This function operates on byte indices and byte counts.
 
 #### `substr`
 
@@ -1455,11 +1630,13 @@ That means:
 - `size()` returns the number of UTF-16 code units
 - `char_count()` returns the number of Unicode scalar values
 - `char_indices()` returns `(code_unit_offset, utf16_char)` pairs
+- `graphemes()` iterates `utf16_string_view` grapheme-cluster slices
 - `grapheme_indices()` returns `(code_unit_offset, utf16_string_view)` pairs
 - `find(char16_t, pos)` is a raw code-unit search
 - `find(utf16_char, pos)` and `find(utf16_string_view, pos)` round `pos` up to the next UTF-16 character boundary
 - `rfind(utf16_char, pos)` and `rfind(utf16_string_view, pos)` round `pos` down to a UTF-16 character boundary
 - `char_at(index)` returns `std::nullopt` if `index` is out of range or lies in the middle of a surrogate pair
+- `to_utf8()` materializes an owning UTF-8 string
 
 ### Synopsis
 
@@ -1481,10 +1658,13 @@ public:
 
     constexpr auto chars() const noexcept;
     constexpr auto reversed_chars() const noexcept;
+    constexpr auto graphemes() const noexcept;
     constexpr size_type size() const noexcept;
     constexpr bool empty() const noexcept;
     constexpr bool is_ascii() const noexcept;
     constexpr auto char_indices() const noexcept;
+    constexpr auto grapheme_indices() const noexcept;
+    constexpr size_type grapheme_count() const noexcept;
 
     constexpr bool contains(utf16_char ch) const noexcept;
     constexpr bool contains(utf16_string_view sv) const noexcept;
@@ -1498,11 +1678,14 @@ public:
     constexpr size_type rfind(utf16_string_view sv, size_type pos = npos) const noexcept;
 
     constexpr bool is_char_boundary(size_type index) const noexcept;
+    constexpr bool is_grapheme_boundary(size_type index) const noexcept;
     constexpr size_type char_count() const noexcept;
     constexpr std::pair<utf16_string_view, utf16_string_view> split(size_type delim) const;
     constexpr std::optional<utf16_char> char_at(size_type index) const noexcept;
     constexpr utf16_char char_at_unchecked(size_type index) const noexcept;
+    constexpr std::optional<utf16_string_view> grapheme_at(size_type index) const noexcept;
     constexpr std::optional<utf16_string_view> substr(size_type pos, size_type count = npos) const noexcept;
+    constexpr std::optional<utf16_string_view> grapheme_substr(size_type pos, size_type count = npos) const noexcept;
     constexpr utf16_char front() const noexcept;
     constexpr utf16_char back() const noexcept;
     constexpr bool starts_with(char16_t ch) const noexcept;
@@ -1513,10 +1696,15 @@ public:
     constexpr bool ends_with(utf16_string_view sv) const noexcept;
     constexpr size_type ceil_char_boundary(size_type pos) const noexcept;
     constexpr size_type floor_char_boundary(size_type pos) const noexcept;
+    constexpr size_type ceil_grapheme_boundary(size_type pos) const noexcept;
+    constexpr size_type floor_grapheme_boundary(size_type pos) const noexcept;
 
     constexpr auto base() const noexcept;
     constexpr std::u16string_view as_view() const noexcept;
     constexpr operator std::u16string_view() const noexcept;
+    template<class Allocator = std::allocator<char8_t>>
+    constexpr basic_utf8_string<Allocator>
+        to_utf8(const Allocator& alloc = Allocator()) const;
 };
 ```
 
@@ -1538,7 +1726,15 @@ static_assert(text.char_count() == 3);
 
 `reversed_chars()` yields the same `utf16_char` values in reverse order.
 
+`graphemes()` yields `utf16_string_view` values, each covering one default Unicode grapheme cluster.
+
+`grapheme_indices()` yields `(code_unit_offset, utf16_string_view)` pairs.
+
+`grapheme_count()` counts default Unicode grapheme clusters rather than scalar values.
+
 `find` and `rfind` behave like the UTF-8 variants, but with UTF-16 code-unit indexing and surrogate-pair boundaries.
+
+`to_utf8()` materializes the same text as an owning UTF-8 string by transcoding through Unicode scalar values. By default this returns `utf8_string`, but you can supply a different allocator and get `basic_utf8_string<Allocator>`.
 
 Example:
 
@@ -1555,6 +1751,13 @@ static_assert(text.floor_char_boundary(3) == 2);
 ### Substrings and boundaries
 
 Like `utf8_string_view`, substring operations are boundary-checked.
+
+The grapheme-oriented helpers use the same code-unit-position model as the rest of the UTF-16 API:
+
+- `is_grapheme_boundary(index)` checks whether a code-unit offset starts a grapheme cluster
+- `ceil_grapheme_boundary(pos)` and `floor_grapheme_boundary(pos)` round a code-unit offset to the nearest grapheme boundary
+- `grapheme_at(index)` returns the grapheme cluster that starts at `index`
+- `grapheme_substr(pos, count)` behaves like `substr`, but requires grapheme boundaries instead of only UTF-16 character boundaries
 
 Example:
 
@@ -1607,6 +1810,39 @@ using namespace unicode_ranges;
 using namespace unicode_ranges::literals;
 
 const auto owned = u"Aé😀"_utf16_s;
+```
+
+Cross-encoding is available through `to_utf8()`, including allocator-aware target construction.
+
+Checked factory construction is also available from raw source text:
+
+```cpp
+static constexpr auto from_bytes(std::string_view bytes,
+                                 const Allocator& alloc = Allocator()) noexcept
+    -> std::expected<basic_utf16_string, utf8_error>;
+static constexpr auto from_bytes(std::wstring_view bytes,
+                                 const Allocator& alloc = Allocator()) noexcept;
+```
+
+Unchecked factory construction from already-valid UTF-16 code units is also allocator-aware:
+
+```cpp
+static constexpr basic_utf16_string
+    from_code_units_unchecked(std::u16string_view code_units,
+                              const Allocator& alloc = Allocator()) noexcept;
+static constexpr basic_utf16_string
+    from_code_units_unchecked(base_type code_units,
+                              const Allocator& alloc) noexcept;
+```
+
+The standard PMR alias is also provided:
+
+```cpp
+namespace unicode_ranges::pmr
+{
+    using utf16_string =
+        basic_utf16_string<std::pmr::polymorphic_allocator<char16_t>>;
+}
 ```
 
 ### Mutation APIs
@@ -1663,16 +1899,23 @@ class basic_utf8_string;
 
 using utf8_string = basic_utf8_string<>;
 
+namespace unicode_ranges::pmr
+{
+    using utf8_string =
+        basic_utf8_string<std::pmr::polymorphic_allocator<char8_t>>;
+}
+
 template<class Allocator>
 class basic_utf8_string
 {
 public:
     basic_utf8_string() = default;
 
-    static constexpr basic_utf8_string from_bytes_unchecked(
-        std::basic_string<char8_t, std::char_traits<char8_t>, Allocator> bytes) noexcept;
-    static constexpr basic_utf8_string from_bytes_unchecked(
-        std::u8string_view bytes, Allocator alloc) noexcept;
+    static constexpr auto from_bytes(std::string_view bytes,
+                                     const Allocator& alloc = Allocator()) noexcept
+        -> std::expected<basic_utf8_string, utf8_error>;
+    static constexpr auto from_bytes(std::wstring_view bytes,
+                                     const Allocator& alloc = Allocator()) noexcept;
 
     constexpr basic_utf8_string(utf8_string_view view,
                                 const Allocator& alloc = Allocator());
@@ -1742,6 +1985,9 @@ public:
     constexpr const char8_t* c_str() const noexcept;
     constexpr operator utf8_string_view() const noexcept;
     constexpr utf8_string_view as_view() const noexcept;
+    template<class Allocator = std::allocator<char16_t>>
+    constexpr basic_utf16_string<Allocator>
+        to_utf16(const Allocator& alloc = Allocator()) const;
     constexpr void push_back(utf8_char ch);
     constexpr void swap(basic_utf8_string& other) noexcept(...);
 
@@ -1778,10 +2024,13 @@ Construction is available from:
 
 - nothing
 - a validated UTF-8 view
+- checked raw source text carried in `std::string_view` or `std::wstring_view`
 - repeated `utf8_char`
 - ranges of `utf8_char`
 - iterator/sentinel pairs
 - initializer lists of `utf8_char`
+
+`from_bytes(...)` is the ergonomic bridge from `std::string` / `std::wstring` into the validated UTF-8 owning type, and both overloads accept an optional allocator.
 
 ### Modifiers
 
@@ -1930,6 +2179,7 @@ on either side when one operand is an owning `utf8_string`.
 - `get_allocator()` returns the stored allocator
 - `as_view()` returns an unchecked `utf8_string_view`
 - `operator utf8_string_view()` converts to a view
+- `to_utf16()` transcodes into an owning UTF-16 string, with optional allocator control
 - `data()` and `c_str()` expose the contiguous byte storage
 
 Example:
@@ -1947,14 +2197,12 @@ s.replace_with_range(1, std::array{ "β"_u8c, "!"_u8c });
 assert(s.char_count() == 4);
 assert(s == "Aβ!!"_utf8_sv);
 assert(s.ends_with("!"_u8c));
+assert(s.to_utf16() == u"AÎ²!!"_utf16_sv);
 ```
 
 ## Reference: views
 
-The view types are split by encoding:
-
-- UTF-8 views are declared in `utf8_ranges/utf8_views.hpp`
-- UTF-16 views are declared in `utf8_ranges/utf16_views.hpp`
+The library provides forward, reverse, grapheme-oriented, and lossy views for both UTF-8 and UTF-16 text.
 
 ### `unicode_ranges::views::utf8_view`
 
@@ -2047,6 +2295,38 @@ Semantics:
 - dereferencing yields `utf8_char` by value
 - `begin()` positions at the last UTF-8 character
 - increment walks backward to the previous UTF-8 lead byte
+
+### `unicode_ranges::views::grapheme_cluster_view<CharT>`
+
+Unchecked forward view over default Unicode grapheme clusters.
+
+In normal use, you typically obtain this view through `text.graphemes()` on a UTF-8 or UTF-16 string/view type.
+
+`CharT` is either:
+
+- `char8_t`, yielding `utf8_string_view`
+- `char16_t`, yielding `utf16_string_view`
+
+Semantics:
+
+- the input must already be valid for the chosen encoding
+- this is a forward range
+- this is not a common range
+- dereferencing yields one borrowed string-view cluster at a time
+- cluster boundaries follow the default extended grapheme-cluster rules from UAX #29
+
+Example:
+
+```cpp
+constexpr auto text = u8"👩‍💻!"_utf8_sv;
+
+static_assert(std::ranges::equal(text.graphemes(), std::array{
+    u8"👩‍💻"_grapheme_utf8,
+    u8"!"_grapheme_utf8
+}));
+```
+
+When formatting a grapheme range, `"{::s}"` is usually the most readable presentation because it formats each cluster as text rather than as an escaped debug string.
 
 ### `unicode_ranges::views::lossy_utf8_view<CharT>`
 
@@ -2410,4 +2690,6 @@ The `is_ascii_*` family does not consult Unicode tables and always returns `fals
 
 ### 5. Grapheme segmentation follows default Unicode rules
 
-`utf8_char` and `utf16_char` still represent single Unicode scalar values. When you need user-perceived characters, use `graphemes()` or `views::grapheme_cluster_view<CharT>`, which segment text according to the default extended grapheme cluster rules from UAX #29.
+`utf8_char` and `utf16_char` still represent single Unicode scalar values. When you need user-perceived characters, use `graphemes()` or `views::grapheme_cluster_view<CharT>`, which segment text according to the default extended grapheme-cluster rules from UAX #29.
+
+Unlike `is_char_boundary()`, grapheme-boundary checks are not naturally constant-time. A grapheme boundary depends on surrounding scalar context, so it cannot be answered by a simple encoding-form test alone.

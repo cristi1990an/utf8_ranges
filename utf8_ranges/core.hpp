@@ -14,6 +14,7 @@
 #include <functional>
 #include <iterator>
 #include <memory>
+#include <memory_resource>
 #include <optional>
 #include <ostream>
 #include <stdexcept>
@@ -45,6 +46,14 @@ class basic_utf16_string;
 
 using utf16_string = basic_utf16_string<>;
 
+namespace pmr
+{
+
+using utf8_string = basic_utf8_string<std::pmr::polymorphic_allocator<char8_t>>;
+using utf16_string = basic_utf16_string<std::pmr::polymorphic_allocator<char16_t>>;
+
+}
+
 template <typename T>
 concept unicode_character =
 	std::same_as<std::remove_cvref_t<T>, utf8_char>
@@ -73,6 +82,17 @@ struct utf16_error
 {
 	utf16_error_code code{};
 	std::size_t first_invalid_code_unit_index = 0;
+};
+
+enum class unicode_scalar_error_code
+{
+	invalid_scalar
+};
+
+struct unicode_scalar_error
+{
+	unicode_scalar_error_code code{};
+	std::size_t first_invalid_element_index = 0;
 };
 
 namespace views
@@ -457,6 +477,22 @@ namespace details
 		return {};
 	}
 
+	inline constexpr std::expected<void, unicode_scalar_error> validate_unicode_scalars(std::wstring_view value) noexcept
+	{
+		for (std::size_t index = 0; index != value.size(); ++index)
+		{
+			if (!is_valid_unicode_scalar(static_cast<std::uint32_t>(value[index])))
+			{
+				return std::unexpected(unicode_scalar_error{
+					.code = unicode_scalar_error_code::invalid_scalar,
+					.first_invalid_element_index = index
+				});
+			}
+		}
+
+		return {};
+	}
+
 	template<typename CharT>
 	inline constexpr std::uint32_t decode_valid_utf8_char(std::basic_string_view<CharT> ch) noexcept
 	{
@@ -766,6 +802,82 @@ namespace details
 			}
 
 			return text.size();
+		}
+
+		template <typename CharT>
+		inline constexpr std::size_t grapheme_count(std::basic_string_view<CharT> text) noexcept
+		{
+			std::size_t count = 0;
+			for (std::size_t index = 0; index < text.size(); index = next_grapheme_boundary(text, index))
+			{
+				++count;
+			}
+
+			return count;
+		}
+
+		template <typename CharT>
+		inline constexpr std::size_t floor_grapheme_boundary(std::basic_string_view<CharT> text, std::size_t index) noexcept
+		{
+			index = (std::min)(text.size(), index);
+			if (index == 0 || index == text.size()) [[unlikely]]
+			{
+				return index;
+			}
+
+			std::size_t current = 0;
+			while (current < text.size())
+			{
+				const auto next = next_grapheme_boundary(text, current);
+				if (next >= index)
+				{
+					return next == index ? next : current;
+				}
+
+				current = next;
+			}
+
+			return text.size();
+		}
+
+		template <typename CharT>
+		inline constexpr std::size_t ceil_grapheme_boundary(std::basic_string_view<CharT> text, std::size_t index) noexcept
+		{
+			index = (std::min)(text.size(), index);
+			if (index == 0 || index == text.size()) [[unlikely]]
+			{
+				return index;
+			}
+
+			std::size_t current = 0;
+			while (current < text.size())
+			{
+				if (current >= index)
+				{
+					return current;
+				}
+
+				const auto next = next_grapheme_boundary(text, current);
+				if (next >= index)
+				{
+					return next;
+				}
+
+				current = next;
+			}
+
+			return text.size();
+		}
+
+		template <typename CharT>
+		inline constexpr bool is_grapheme_boundary(std::basic_string_view<CharT> text, std::size_t index) noexcept
+		{
+			if (index > text.size()) [[unlikely]]
+			{
+				return false;
+			}
+
+			return floor_grapheme_boundary(text, index) == index;
 		}
 
 		namespace literals

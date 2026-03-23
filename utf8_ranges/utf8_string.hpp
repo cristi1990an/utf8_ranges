@@ -14,25 +14,99 @@ class basic_utf8_string : public details::utf8_string_crtp<basic_utf8_string<All
 	using equivalent_string_view = std::u8string_view;
 
  public:
- 	using allocator_type = Allocator;
- 	using value_type = utf8_char;
- 	using size_type = std::size_t;
- 	using difference_type = std::ptrdiff_t;
+	using allocator_type = Allocator;
+	using value_type = utf8_char;
+	using size_type = std::size_t;
+	using difference_type = std::ptrdiff_t;
 	static constexpr size_type npos = static_cast<size_type>(-1);
 
-	static constexpr basic_utf8_string from_bytes_unchecked(base_type bytes) noexcept
+	static constexpr auto from_bytes(std::string_view bytes, const Allocator& alloc = Allocator()) noexcept
+		-> std::expected<basic_utf8_string, utf8_error>
 	{
-		basic_utf8_string result;
-		result.base_ = std::move(bytes);
-		return result;
+		if (auto validation = details::validate_utf8(bytes); !validation) [[unlikely]]
+		{
+			return std::unexpected(validation.error());
+		}
+
+		return from_bytes_unchecked(bytes, alloc);
 	}
 
-	static constexpr basic_utf8_string from_bytes_unchecked(equivalent_string_view bytes, Allocator alloc) noexcept
+	static constexpr auto from_bytes(std::wstring_view bytes, const Allocator& alloc = Allocator()) noexcept
+		-> std::expected<basic_utf8_string, utf16_error>
+		requires (sizeof(wchar_t) == 2)
 	{
-		basic_utf8_string result;
-		result.base_ = base_type{ bytes, std::move(alloc) };
-		return result;
+		if (auto validation = details::validate_utf16(bytes); !validation) [[unlikely]]
+		{
+			return std::unexpected(validation.error());
+		}
+
+		return from_bytes_unchecked(bytes, alloc);
 	}
+
+	static constexpr auto from_bytes(std::wstring_view bytes, const Allocator& alloc = Allocator()) noexcept
+		-> std::expected<basic_utf8_string, unicode_scalar_error>
+		requires (sizeof(wchar_t) == 4)
+	{
+		if (auto validation = details::validate_unicode_scalars(bytes); !validation) [[unlikely]]
+		{
+			return std::unexpected(validation.error());
+		}
+
+		return from_bytes_unchecked(bytes, alloc);
+	}
+
+private:
+	static constexpr auto from_bytes_unchecked(std::string_view bytes, const Allocator& alloc) noexcept
+		-> basic_utf8_string
+	{
+		base_type result{ alloc };
+		result.reserve(bytes.size());
+		for (char ch : bytes)
+		{
+			result.push_back(static_cast<char8_t>(ch));
+		}
+
+		return from_base_unchecked(std::move(result));
+	}
+
+	static constexpr auto from_bytes_unchecked(std::wstring_view bytes, const Allocator& alloc) noexcept
+		-> basic_utf8_string
+	{
+		if constexpr (sizeof(wchar_t) == 2)
+		{
+			base_type result{ alloc };
+			for (std::size_t index = 0; index != bytes.size();)
+			{
+				const auto first = static_cast<std::uint16_t>(bytes[index]);
+				const auto count = details::is_utf16_high_surrogate(first) ? 2u : 1u;
+				std::array<char16_t, 2> code_units{};
+				for (std::size_t i = 0; i != count; ++i)
+				{
+					code_units[i] = static_cast<char16_t>(bytes[index + i]);
+				}
+
+				const auto scalar = details::decode_valid_utf16_char(std::u16string_view{ code_units.data(), count });
+				std::array<char8_t, 4> encoded{};
+				const auto encoded_count = details::encode_unicode_scalar_utf8_unchecked(scalar, encoded.data());
+				result.append(encoded.data(), encoded.data() + encoded_count);
+				index += count;
+			}
+
+			return from_base_unchecked(std::move(result));
+		}
+
+		base_type result{ alloc };
+		for (wchar_t ch : bytes)
+		{
+			std::array<char8_t, 4> encoded{};
+			const auto encoded_count = details::encode_unicode_scalar_utf8_unchecked(static_cast<std::uint32_t>(ch), encoded.data());
+			result.append(encoded.data(), encoded.data() + encoded_count);
+		}
+
+		return from_base_unchecked(std::move(result));
+	}
+
+public:
 
 	basic_utf8_string() = default;
 	basic_utf8_string(const basic_utf8_string&) = default;
@@ -592,66 +666,73 @@ class basic_utf8_string : public details::utf8_string_crtp<basic_utf8_string<All
 
 	friend constexpr basic_utf8_string operator+(const basic_utf8_string& lhs, const basic_utf8_string& rhs)
 	{
-		return from_bytes_unchecked(lhs.base_ + rhs.base_);
+		return from_base_unchecked(lhs.base_ + rhs.base_);
 	}
 
 	friend constexpr basic_utf8_string operator+(basic_utf8_string&& lhs, const basic_utf8_string& rhs)
 	{
-		return from_bytes_unchecked(std::move(lhs.base_) + rhs.base_);
+		return from_base_unchecked(std::move(lhs.base_) + rhs.base_);
 	}
 
 	friend constexpr basic_utf8_string operator+(const basic_utf8_string& lhs, basic_utf8_string&& rhs)
 	{
-		return from_bytes_unchecked(lhs.base_ + std::move(rhs.base_));
+		return from_base_unchecked(lhs.base_ + std::move(rhs.base_));
 	}
 
 	friend constexpr basic_utf8_string operator+(basic_utf8_string&& lhs, basic_utf8_string&& rhs)
 	{
-		return from_bytes_unchecked(std::move(lhs.base_) + std::move(rhs.base_));
+		return from_base_unchecked(std::move(lhs.base_) + std::move(rhs.base_));
 	}
 
 	friend constexpr basic_utf8_string operator+(const basic_utf8_string& lhs, utf8_string_view rhs)
 	{
-		return from_bytes_unchecked(lhs.base_ + base_type{ rhs.base(), lhs.get_allocator() });
+		return from_base_unchecked(lhs.base_ + base_type{ rhs.base(), lhs.get_allocator() });
 	}
 
 	friend constexpr basic_utf8_string operator+(basic_utf8_string&& lhs, utf8_string_view rhs)
 	{
-		return from_bytes_unchecked(std::move(lhs.base_) + base_type{ rhs.base(), lhs.get_allocator() });
+		return from_base_unchecked(std::move(lhs.base_) + base_type{ rhs.base(), lhs.get_allocator() });
 	}
 
 	friend constexpr basic_utf8_string operator+(utf8_string_view lhs, const basic_utf8_string& rhs)
 	{
-		return from_bytes_unchecked(base_type{ lhs.base(), rhs.get_allocator() } + rhs.base_);
+		return from_base_unchecked(base_type{ lhs.base(), rhs.get_allocator() } + rhs.base_);
 	}
 
 	friend constexpr basic_utf8_string operator+(utf8_string_view lhs, basic_utf8_string&& rhs)
 	{
-		return from_bytes_unchecked(base_type{ lhs.base(), rhs.get_allocator() } + std::move(rhs.base_));
+		return from_base_unchecked(base_type{ lhs.base(), rhs.get_allocator() } + std::move(rhs.base_));
 	}
 
 	friend constexpr basic_utf8_string operator+(const basic_utf8_string& lhs, utf8_char rhs)
 	{
-		return from_bytes_unchecked(lhs.base_ + base_type{ rhs.as_view(), lhs.get_allocator() });
+		return from_base_unchecked(lhs.base_ + base_type{ rhs.as_view(), lhs.get_allocator() });
 	}
 
 	friend constexpr basic_utf8_string operator+(basic_utf8_string&& lhs, utf8_char rhs)
 	{
-		return from_bytes_unchecked(std::move(lhs.base_) + base_type{ rhs.as_view(), lhs.get_allocator() });
+		return from_base_unchecked(std::move(lhs.base_) + base_type{ rhs.as_view(), lhs.get_allocator() });
 	}
 
 	friend constexpr basic_utf8_string operator+(utf8_char lhs, const basic_utf8_string& rhs)
 	{
-		return from_bytes_unchecked(base_type{ lhs.as_view(), rhs.get_allocator() } + rhs.base_);
+		return from_base_unchecked(base_type{ lhs.as_view(), rhs.get_allocator() } + rhs.base_);
 	}
 
 	friend constexpr basic_utf8_string operator+(utf8_char lhs, basic_utf8_string&& rhs)
 	{
-		return from_bytes_unchecked(base_type{ lhs.as_view(), rhs.get_allocator() } + std::move(rhs.base_));
+		return from_base_unchecked(base_type{ lhs.as_view(), rhs.get_allocator() } + std::move(rhs.base_));
 	}
 
 private:
 	using base_class = details::utf8_string_crtp<basic_utf8_string<Allocator>, utf8_string_view>;
+
+	static constexpr basic_utf8_string from_base_unchecked(base_type bytes) noexcept
+	{
+		basic_utf8_string result;
+		result.base_ = std::move(bytes);
+		return result;
+	}
 
 	base_type base_;
 };
@@ -701,5 +782,8 @@ namespace literals
 }
 
 }
+
+#include "utf16_string.hpp"
+#include "transcoding.hpp"
 
 #endif // UTF8_RANGES_UTF8_STRING_HPP

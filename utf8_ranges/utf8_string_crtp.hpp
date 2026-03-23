@@ -193,6 +193,8 @@ public:
 	}
 
 	constexpr auto graphemes() const noexcept -> views::grapheme_cluster_view<char8_t>;
+	template <typename Allocator = std::allocator<char16_t>>
+	constexpr basic_utf16_string<Allocator> to_utf16(const Allocator& alloc = Allocator()) const;
 
 	constexpr size_type size() const noexcept
 	{
@@ -217,6 +219,11 @@ public:
 	constexpr auto grapheme_indices() const noexcept
 	{
 		return utf8_grapheme_indices_view<View>::from_bytes_unchecked(byte_view());
+	}
+
+	constexpr bool is_grapheme_boundary(size_type index) const noexcept
+	{
+		return details::is_grapheme_boundary(byte_view(), index);
 	}
 
 	constexpr bool contains(utf8_char ch) const noexcept
@@ -461,6 +468,11 @@ public:
 		return static_cast<size_type>(std::ranges::distance(chars()));
 	}
 
+	constexpr size_type grapheme_count() const noexcept
+	{
+		return details::grapheme_count(byte_view());
+	}
+
 	constexpr std::pair<View, View> split(size_type delim) const
 	{
 		if (!is_char_boundary(delim)) [[unlikely]]
@@ -492,6 +504,17 @@ public:
 		return utf8_char::from_utf8_bytes_unchecked(byte_view().data() + index, len);
 	}
 
+	constexpr std::optional<View> grapheme_at(size_type index) const noexcept
+	{
+		if (index >= size() || !is_grapheme_boundary(index)) [[unlikely]]
+		{
+			return std::nullopt;
+		}
+
+		const auto end = details::next_grapheme_boundary(byte_view(), index);
+		return View::from_bytes_unchecked(byte_view().substr(index, end - index));
+	}
+
 	constexpr std::optional<View> substr(size_type pos, size_type count = npos) const noexcept
 	{
 		if (!is_char_boundary(pos)) [[unlikely]]
@@ -504,6 +527,25 @@ public:
 			: (std::min)(size(), pos + count);
 
 		if (!is_char_boundary(end)) [[unlikely]]
+		{
+			return std::nullopt;
+		}
+
+		return View::from_bytes_unchecked(byte_view().substr(pos, end - pos));
+	}
+
+	constexpr std::optional<View> grapheme_substr(size_type pos, size_type count = npos) const noexcept
+	{
+		if (!is_grapheme_boundary(pos)) [[unlikely]]
+		{
+			return std::nullopt;
+		}
+
+		const auto end = (count == npos)
+			? size()
+			: (std::min)(size(), pos + count);
+
+		if (!is_grapheme_boundary(end)) [[unlikely]]
 		{
 			return std::nullopt;
 		}
@@ -581,6 +623,16 @@ public:
 		}
 
 		return pos;
+	}
+
+	constexpr size_type ceil_grapheme_boundary(size_type pos) const noexcept
+	{
+		return details::ceil_grapheme_boundary(byte_view(), pos);
+	}
+
+	constexpr size_type floor_grapheme_boundary(size_type pos) const noexcept
+	{
+		return details::floor_grapheme_boundary(byte_view(), pos);
 	}
 
 protected:
