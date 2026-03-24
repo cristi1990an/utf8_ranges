@@ -684,7 +684,7 @@ inline void run_unicode_ranges_tests()
 	assert((std::ranges::range<views::lossy_utf16_view<wchar_t>>));
 
 	{
-		const auto runtime_latin1_ch = utf8_char::from_scalar_unchecked(0x00E9u);
+		[[maybe_unused]] const auto runtime_latin1_ch = utf8_char::from_scalar_unchecked(0x00E9u);
 		const std::u8string runtime_utf8_storage = u8"A\u00E9\u20AC";
 		const auto runtime_utf8_text = unwrap_utf8_view(runtime_utf8_storage);
 		const std::u16string runtime_utf16_storage = u"A\u00E9\U0001F600";
@@ -1161,7 +1161,7 @@ inline void run_unicode_ranges_tests()
 
 	{
 		utf8_char ch = utf8_char::from_scalar_unchecked(0x7Fu);
-		const utf8_char old = ch++;
+		[[maybe_unused]] const utf8_char old = ch++;
 		assert(old.as_scalar() == 0x7Fu);
 		assert(ch.as_scalar() == 0x80u);
 	}
@@ -1179,7 +1179,7 @@ inline void run_unicode_ranges_tests()
 	assert(!utf8_char::from_scalar(0x110000u).has_value());
 	{
 		utf8_char ch = utf8_char::from_scalar_unchecked(0x80u);
-		const utf8_char old = ch--;
+		[[maybe_unused]] const utf8_char old = ch--;
 		assert(old.as_scalar() == 0x80u);
 		assert(ch.as_scalar() == 0x7Fu);
 	}
@@ -1198,13 +1198,13 @@ inline void run_unicode_ranges_tests()
 	assert(utf8_char::from_scalar(0x20ACu).has_value());
 	{
 		std::array<char16_t, 2> buffer{};
-		const auto n = u8"\u20AC"_u8c.encode_utf16<char16_t>(buffer.begin());
+		[[maybe_unused]] const auto n = u8"\u20AC"_u8c.encode_utf16<char16_t>(buffer.begin());
 		assert(n == 1);
 		assert(buffer[0] == static_cast<char16_t>(0x20ACu));
 	}
 	{
 		std::array<char16_t, 2> buffer{};
-		const auto n = u8"\U0001F600"_u8c.encode_utf16<char16_t>(buffer.begin());
+		[[maybe_unused]] const auto n = u8"\U0001F600"_u8c.encode_utf16<char16_t>(buffer.begin());
 		assert(n == 2);
 		assert(buffer[0] == static_cast<char16_t>(0xD83Du));
 		assert(buffer[1] == static_cast<char16_t>(0xDE00u));
@@ -1220,7 +1220,7 @@ inline void run_unicode_ranges_tests()
 	assert(u"\U0001F600"_u16c.code_unit_count() == 2);
 	{
 		utf16_char ch = utf16_char::from_scalar_unchecked(0x7Fu);
-		const auto old = ch++;
+		[[maybe_unused]] const auto old = ch++;
 		assert(old.as_scalar() == 0x7Fu);
 		assert(ch.as_scalar() == 0x80u);
 	}
@@ -1254,13 +1254,13 @@ inline void run_unicode_ranges_tests()
 	}
 	{
 		utf16_char utf16 = u8"\u20AC"_u8c;
-		utf8_char utf8 = utf16;
+		[[maybe_unused]] utf8_char utf8 = utf16;
 		assert(utf16 == u"\u20AC"_u16c);
 		assert(utf8 == u8"\u20AC"_u8c);
 	}
 	{
 		std::array<char, 4> buffer{};
-		const auto n = u"\u20AC"_u16c.encode_utf8<char>(buffer.begin());
+		[[maybe_unused]] const auto n = u"\u20AC"_u16c.encode_utf8<char>(buffer.begin());
 		assert(n == 3);
 		assert(static_cast<unsigned char>(buffer[0]) == 0xE2u);
 		assert(static_cast<unsigned char>(buffer[1]) == 0x82u);
