@@ -788,7 +788,7 @@ inline void run_unicode_ranges_tests()
 		assert(runtime_utf8_text.back().value() == u8"\u20AC"_u8c);
 		assert(runtime_utf8_text.back_unchecked() == u8"\u20AC"_u8c);
 		{
-			const utf8_string_view empty_text{};
+			[[maybe_unused]] const utf8_string_view empty_text{};
 			assert(!empty_text.front().has_value());
 			assert(!empty_text.back().has_value());
 		}
@@ -834,7 +834,7 @@ inline void run_unicode_ranges_tests()
 		assert(runtime_utf8_text.find_last_not_of(u8""_utf8_sv) == 3);
 		{
 			const std::u8string grapheme_storage = u8"e\u0301\U0001F1F7\U0001F1F4!";
-			const auto grapheme_text = unwrap_utf8_view(grapheme_storage);
+			[[maybe_unused]] const auto grapheme_text = unwrap_utf8_view(grapheme_storage);
 
 			assert(grapheme_text.find_grapheme(u8"e\u0301"_grapheme_utf8) == 0);
 			assert(grapheme_text.find_grapheme(u8"\U0001F1F7\U0001F1F4"_grapheme_utf8, 1) == 3);
@@ -863,7 +863,7 @@ inline void run_unicode_ranges_tests()
 		assert(runtime_utf8_text < u8"Z"_utf8_sv);
 		{
 			const std::u8string text_storage = u8"e\u0301X";
-			const auto text = unwrap_utf8_view(text_storage);
+			[[maybe_unused]] const auto text = unwrap_utf8_view(text_storage);
 			assert(std::ranges::equal(text.graphemes(), std::array{
 				u8"e\u0301"_grapheme_utf8,
 				u8"X"_grapheme_utf8
@@ -871,7 +871,7 @@ inline void run_unicode_ranges_tests()
 		}
 		{
 			const std::u8string text_storage = u8"\r\nX";
-			const auto text = unwrap_utf8_view(text_storage);
+			[[maybe_unused]] const auto text = unwrap_utf8_view(text_storage);
 			assert(std::ranges::equal(text.graphemes(), std::array{
 				u8"\r\n"_grapheme_utf8,
 				u8"X"_grapheme_utf8
@@ -879,7 +879,7 @@ inline void run_unicode_ranges_tests()
 		}
 		{
 			const std::u8string text_storage = u8"\U0001F1F7\U0001F1F4!";
-			const auto text = unwrap_utf8_view(text_storage);
+			[[maybe_unused]] const auto text = unwrap_utf8_view(text_storage);
 			assert(std::ranges::equal(text.graphemes(), std::array{
 				u8"\U0001F1F7\U0001F1F4"_grapheme_utf8,
 				u8"!"_grapheme_utf8
@@ -887,7 +887,7 @@ inline void run_unicode_ranges_tests()
 		}
 		{
 			const std::u8string text_storage = u8"\U0001F469\u200D\U0001F4BB!";
-			const auto text = unwrap_utf8_view(text_storage);
+			[[maybe_unused]] const auto text = unwrap_utf8_view(text_storage);
 			assert(std::ranges::equal(text.graphemes(), std::array{
 				u8"\U0001F469\u200D\U0001F4BB"_grapheme_utf8,
 				u8"!"_grapheme_utf8
@@ -895,7 +895,7 @@ inline void run_unicode_ranges_tests()
 		}
 		{
 			const std::u8string text_storage = u8"e\u0301\U0001F1F7\U0001F1F4!";
-			const auto text = unwrap_utf8_view(text_storage);
+			[[maybe_unused]] const auto text = unwrap_utf8_view(text_storage);
 			assert(std::ranges::equal(text.reversed_graphemes(), std::array{
 				u8"!"_grapheme_utf8,
 				u8"\U0001F1F7\U0001F1F4"_grapheme_utf8,
@@ -905,42 +905,42 @@ inline void run_unicode_ranges_tests()
 		assert(u8"e\u0301"_grapheme_utf8 == u8"e\u0301"_utf8_sv);
 		{
 			const std::u8string text_storage = u8"A\u00E9\U0001F600";
-			const auto text = unwrap_utf8_view(text_storage);
+			[[maybe_unused]] const auto text = unwrap_utf8_view(text_storage);
 			assert(text.to_utf16() == u"A\u00E9\U0001F600"_utf16_sv);
 		}
 		{
 			auto it = runtime_utf8_text.char_indices().begin();
 			assert(it != runtime_utf8_text.char_indices().end());
-			const auto [i0, c0] = *it++;
+			[[maybe_unused]] const auto [i0, c0] = *it++;
 			assert(i0 == 0);
 			assert(c0 == u8"A"_u8c);
-			const auto [i1, c1] = *it++;
+			[[maybe_unused]] const auto [i1, c1] = *it++;
 			assert(i1 == 1);
 			assert(c1 == u8"\u00E9"_u8c);
-			const auto [i2, c2] = *it++;
+			[[maybe_unused]] const auto [i2, c2] = *it++;
 			assert(i2 == 3);
 			assert(c2 == u8"\u20AC"_u8c);
 			assert(it == runtime_utf8_text.char_indices().end());
 		}
 		{
 			const std::u8string text_storage = u8"e\u0301\U0001F1F7\U0001F1F4!";
-			const auto text = unwrap_utf8_view(text_storage);
+			[[maybe_unused]] const auto text = unwrap_utf8_view(text_storage);
 			auto it = text.grapheme_indices().begin();
 			assert(it != text.grapheme_indices().end());
-			const auto [i0, g0] = *it++;
+			[[maybe_unused]] const auto [i0, g0] = *it++;
 			assert(i0 == 0);
 			assert(g0 == u8"e\u0301"_grapheme_utf8);
-			const auto [i1, g1] = *it++;
+			[[maybe_unused]] const auto [i1, g1] = *it++;
 			assert(i1 == 3);
 			assert(g1 == u8"\U0001F1F7\U0001F1F4"_grapheme_utf8);
-			const auto [i2, g2] = *it++;
+			[[maybe_unused]] const auto [i2, g2] = *it++;
 			assert(i2 == 11);
 			assert(g2 == u8"!"_grapheme_utf8);
 			assert(it == text.grapheme_indices().end());
 		}
 		{
 			const std::u8string text_storage = u8"e\u0301\U0001F1F7\U0001F1F4!";
-			const auto text = unwrap_utf8_view(text_storage);
+			[[maybe_unused]] const auto text = unwrap_utf8_view(text_storage);
 			assert(text.grapheme_count() == 3);
 			assert(text.is_grapheme_boundary(0));
 			assert(!text.is_grapheme_boundary(1));
@@ -989,7 +989,7 @@ inline void run_unicode_ranges_tests()
 		assert(runtime_utf16_text.back().value() == u"\U0001F600"_u16c);
 		assert(runtime_utf16_text.back_unchecked() == u"\U0001F600"_u16c);
 		{
-			const utf16_string_view empty_text{};
+			[[maybe_unused]] const utf16_string_view empty_text{};
 			assert(!empty_text.front().has_value());
 			assert(!empty_text.back().has_value());
 		}
@@ -1031,7 +1031,7 @@ inline void run_unicode_ranges_tests()
 		assert(runtime_utf16_text.find_last_not_of(u""_utf16_sv) == 2);
 		{
 			const std::u16string grapheme_storage = u"e\u0301\U0001F1F7\U0001F1F4!";
-			const auto grapheme_text = unwrap_utf16_view(grapheme_storage);
+			[[maybe_unused]] const auto grapheme_text = unwrap_utf16_view(grapheme_storage);
 
 			assert(grapheme_text.find_grapheme(u"e\u0301"_grapheme_utf16) == 0);
 			assert(grapheme_text.find_grapheme(u"\U0001F1F7\U0001F1F4"_grapheme_utf16, 1) == 2);
@@ -1058,7 +1058,7 @@ inline void run_unicode_ranges_tests()
 		assert(runtime_utf16_text < u"Z"_utf16_sv);
 		{
 			const std::u16string text_storage = u"e\u0301X";
-			const auto text = unwrap_utf16_view(text_storage);
+			[[maybe_unused]] const auto text = unwrap_utf16_view(text_storage);
 			assert(std::ranges::equal(text.graphemes(), std::array{
 				u"e\u0301"_grapheme_utf16,
 				u"X"_grapheme_utf16
@@ -1066,7 +1066,7 @@ inline void run_unicode_ranges_tests()
 		}
 		{
 			const std::u16string text_storage = u"\r\nX";
-			const auto text = unwrap_utf16_view(text_storage);
+			[[maybe_unused]] const auto text = unwrap_utf16_view(text_storage);
 			assert(std::ranges::equal(text.graphemes(), std::array{
 				u"\r\n"_grapheme_utf16,
 				u"X"_grapheme_utf16
@@ -1074,7 +1074,7 @@ inline void run_unicode_ranges_tests()
 		}
 		{
 			const std::u16string text_storage = u"\U0001F1F7\U0001F1F4!";
-			const auto text = unwrap_utf16_view(text_storage);
+			[[maybe_unused]] const auto text = unwrap_utf16_view(text_storage);
 			assert(std::ranges::equal(text.graphemes(), std::array{
 				u"\U0001F1F7\U0001F1F4"_grapheme_utf16,
 				u"!"_grapheme_utf16
@@ -1082,7 +1082,7 @@ inline void run_unicode_ranges_tests()
 		}
 		{
 			const std::u16string text_storage = u"\U0001F469\u200D\U0001F4BB!";
-			const auto text = unwrap_utf16_view(text_storage);
+			[[maybe_unused]] const auto text = unwrap_utf16_view(text_storage);
 			assert(std::ranges::equal(text.graphemes(), std::array{
 				u"\U0001F469\u200D\U0001F4BB"_grapheme_utf16,
 				u"!"_grapheme_utf16
@@ -1090,7 +1090,7 @@ inline void run_unicode_ranges_tests()
 		}
 		{
 			const std::u16string text_storage = u"e\u0301\U0001F1F7\U0001F1F4!";
-			const auto text = unwrap_utf16_view(text_storage);
+			[[maybe_unused]] const auto text = unwrap_utf16_view(text_storage);
 			assert(std::ranges::equal(text.reversed_graphemes(), std::array{
 				u"!"_grapheme_utf16,
 				u"\U0001F1F7\U0001F1F4"_grapheme_utf16,
@@ -1100,42 +1100,42 @@ inline void run_unicode_ranges_tests()
 		assert(u"e\u0301"_grapheme_utf16 == u"e\u0301"_utf16_sv);
 		{
 			const std::u16string text_storage = u"A\u00E9\U0001F600";
-			const auto text = unwrap_utf16_view(text_storage);
+			[[maybe_unused]] const auto text = unwrap_utf16_view(text_storage);
 			assert(text.to_utf8() == u8"A\u00E9\U0001F600"_utf8_sv);
 		}
 		{
 			auto it = runtime_utf16_text.char_indices().begin();
 			assert(it != runtime_utf16_text.char_indices().end());
-			const auto [i0, c0] = *it++;
+			[[maybe_unused]] const auto [i0, c0] = *it++;
 			assert(i0 == 0);
 			assert(c0 == u"A"_u16c);
-			const auto [i1, c1] = *it++;
+			[[maybe_unused]] const auto [i1, c1] = *it++;
 			assert(i1 == 1);
 			assert(c1 == u"\u00E9"_u16c);
-			const auto [i2, c2] = *it++;
+			[[maybe_unused]] const auto [i2, c2] = *it++;
 			assert(i2 == 2);
 			assert(c2 == u"\U0001F600"_u16c);
 			assert(it == runtime_utf16_text.char_indices().end());
 		}
 		{
 			const std::u16string text_storage = u"e\u0301\U0001F1F7\U0001F1F4!";
-			const auto text = unwrap_utf16_view(text_storage);
+			[[maybe_unused]] const auto text = unwrap_utf16_view(text_storage);
 			auto it = text.grapheme_indices().begin();
 			assert(it != text.grapheme_indices().end());
-			const auto [i0, g0] = *it++;
+			[[maybe_unused]] const auto [i0, g0] = *it++;
 			assert(i0 == 0);
 			assert(g0 == u"e\u0301"_grapheme_utf16);
-			const auto [i1, g1] = *it++;
+			[[maybe_unused]] const auto [i1, g1] = *it++;
 			assert(i1 == 2);
 			assert(g1 == u"\U0001F1F7\U0001F1F4"_grapheme_utf16);
-			const auto [i2, g2] = *it++;
+			[[maybe_unused]] const auto [i2, g2] = *it++;
 			assert(i2 == 6);
 			assert(g2 == u"!"_grapheme_utf16);
 			assert(it == text.grapheme_indices().end());
 		}
 		{
 			const std::u16string text_storage = u"e\u0301\U0001F1F7\U0001F1F4!";
-			const auto text = unwrap_utf16_view(text_storage);
+			[[maybe_unused]] const auto text = unwrap_utf16_view(text_storage);
 			assert(text.grapheme_count() == 3);
 			assert(text.is_grapheme_boundary(0));
 			assert(!text.is_grapheme_boundary(1));
