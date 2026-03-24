@@ -28,6 +28,12 @@ It provides validated UTF-8 and UTF-16 characters, borrowed views, owning string
 > [!WARNING]
 > `unicode_ranges::details` contains implementation details only. It is not part of the supported public API.
 
+> [!IMPORTANT]
+> Borrowed APIs return views or ranges into existing storage.
+> `chars()`, `reversed_chars()`, `graphemes()`, `char_indices()`, `grapheme_indices()`, `as_view()`, and `as_utf8_view()` do not own their data.
+> Do not let them outlive the underlying string storage, and do not keep them across mutations of an owning string.
+> For `utf8_char` and `utf16_char`, the borrowed views point into the character object itself.
+
 ## Contents
 
 1. [Goals](#goals)
@@ -102,7 +108,7 @@ The update workflow is:
 
 1. refresh the raw Unicode data under `tools/unicode_data/<version>/`
 2. rerun `tools/regenerate_unicode_tables.ps1`
-3. commit the regenerated `utf8_ranges/unicode_tables.hpp`
+3. commit the regenerated `unicode_ranges/unicode_tables.hpp`
 4. update the changelog and any affected documentation
 
 Example:
@@ -114,6 +120,12 @@ static_assert(std::get<2>(unicode_ranges::unicode_version) == 0);
 ```
 
 ## Quick start
+
+> [!TIP]
+> Choose the entry point by ownership:
+> use `_utf8_sv` / `_utf16_sv` for validated compile-time views,
+> `utf8_string::from_bytes(...)` / `utf16_string::from_bytes(...)` for runtime validation of raw input,
+> and `_utf8_s` / `_utf16_s` when you want an owning validated string immediately.
 
 Suppose you have UTF-8 text such as `café €`, and you want to:
 
@@ -263,6 +275,10 @@ int main()
 ```
 
 `chars()` iterates Unicode scalar values, while `graphemes()` iterates user-perceived characters using the default Unicode grapheme-cluster rules.
+
+> [!NOTE]
+> `chars()` and `graphemes()` are borrowing range views. Keep them only while the underlying text storage is still alive and unchanged.
+> For formatted output, `{:m}` is useful for scalar indices and `{::s}` is useful for printing grapheme ranges as plain text slices.
 
 ## Error model
 
@@ -529,6 +545,10 @@ constexpr std::u8string_view as_view() const noexcept;
 
 Returns a `std::u8string_view` over the encoded UTF-8 bytes.
 
+> [!WARNING]
+> The returned view borrows from the `utf8_char` object itself.
+> It must not outlive that character object.
+
 #### `as_utf8_view`
 
 ```cpp
@@ -536,6 +556,10 @@ constexpr utf8_string_view as_utf8_view() const noexcept;
 ```
 
 Returns a validated string view of this single character.
+
+> [!WARNING]
+> This is also a borrowing view into the `utf8_char` object itself.
+> It is safe for named objects, but must not be kept after the character object is destroyed.
 
 #### `operator std::u8string_view`
 
@@ -880,6 +904,10 @@ constexpr std::u16string_view as_view() const noexcept;
 
 Returns a `std::u16string_view` over the stored UTF-16 code units.
 
+> [!WARNING]
+> The returned view borrows from the `utf16_char` object itself.
+> It must not outlive that character object.
+
 #### `code_unit_count`
 
 ```cpp
@@ -998,9 +1026,21 @@ public:
     constexpr size_type find(char8_t ch, size_type pos = 0) const noexcept;
     constexpr size_type find(utf8_char ch, size_type pos = 0) const noexcept;
     constexpr size_type find(utf8_string_view sv, size_type pos = 0) const noexcept;
+    constexpr size_type find_first_of(char8_t ch, size_type pos = 0) const noexcept;
+    constexpr size_type find_first_of(utf8_char ch, size_type pos = 0) const noexcept;
+    constexpr size_type find_first_of(utf8_string_view sv, size_type pos = 0) const noexcept;
+    constexpr size_type find_first_not_of(char8_t ch, size_type pos = 0) const noexcept;
+    constexpr size_type find_first_not_of(utf8_char ch, size_type pos = 0) const noexcept;
+    constexpr size_type find_first_not_of(utf8_string_view sv, size_type pos = 0) const noexcept;
     constexpr size_type rfind(char8_t ch, size_type pos = npos) const noexcept;
     constexpr size_type rfind(utf8_char ch, size_type pos = npos) const noexcept;
     constexpr size_type rfind(utf8_string_view sv, size_type pos = npos) const noexcept;
+    constexpr size_type find_last_of(char8_t ch, size_type pos = npos) const noexcept;
+    constexpr size_type find_last_of(utf8_char ch, size_type pos = npos) const noexcept;
+    constexpr size_type find_last_of(utf8_string_view sv, size_type pos = npos) const noexcept;
+    constexpr size_type find_last_not_of(char8_t ch, size_type pos = npos) const noexcept;
+    constexpr size_type find_last_not_of(utf8_char ch, size_type pos = npos) const noexcept;
+    constexpr size_type find_last_not_of(utf8_string_view sv, size_type pos = npos) const noexcept;
     constexpr bool is_char_boundary(size_type index) const noexcept;
     constexpr bool is_grapheme_boundary(size_type index) const noexcept;
     constexpr size_type ceil_char_boundary(size_type pos) const noexcept;
@@ -1062,6 +1102,10 @@ Use only if the input is already known to be valid UTF-8.
 
 Returns the underlying `std::u8string_view`.
 
+> [!WARNING]
+> This view borrows from the underlying UTF-8 storage.
+> It must not outlive that storage.
+
 Complexity:
 
 - Constant
@@ -1075,6 +1119,10 @@ constexpr auto chars() const noexcept;
 ```
 
 Returns a `unicode_ranges::views::utf8_view` over the contained Unicode scalar values.
+
+> [!WARNING]
+> The returned range borrows from the underlying UTF-8 storage.
+> Do not keep it after the source storage is destroyed or after an owning source string is mutated.
 
 Preconditions:
 
@@ -1111,6 +1159,11 @@ constexpr auto graphemes() const noexcept;
 Returns a `unicode_ranges::views::grapheme_cluster_view<char8_t>` over the contained text.
 
 Each element is a `utf8_string_view` representing one default Unicode grapheme cluster.
+
+> [!WARNING]
+> Like `chars()`, this is a borrowing range view over the underlying UTF-8 storage.
+
+`find_grapheme`, `rfind_grapheme`, and `contains_grapheme` search at grapheme-cluster boundaries, unlike `find` / `rfind`, which are character-boundary-based for validated Unicode needles. `find_first_of`, `find_first_not_of`, `find_last_of`, and `find_last_not_of` follow the same rule: raw `char8_t` overloads work on bytes, while `utf8_char` and `utf8_string_view` overloads operate on validated UTF-8 characters.
 
 Complexity:
 
@@ -1672,10 +1725,22 @@ public:
     constexpr size_type find(char16_t ch, size_type pos = 0) const noexcept;
     constexpr size_type find(utf16_char ch, size_type pos = 0) const noexcept;
     constexpr size_type find(utf16_string_view sv, size_type pos = 0) const noexcept;
+    constexpr size_type find_first_of(char16_t ch, size_type pos = 0) const noexcept;
+    constexpr size_type find_first_of(utf16_char ch, size_type pos = 0) const noexcept;
+    constexpr size_type find_first_of(utf16_string_view sv, size_type pos = 0) const noexcept;
+    constexpr size_type find_first_not_of(char16_t ch, size_type pos = 0) const noexcept;
+    constexpr size_type find_first_not_of(utf16_char ch, size_type pos = 0) const noexcept;
+    constexpr size_type find_first_not_of(utf16_string_view sv, size_type pos = 0) const noexcept;
 
     constexpr size_type rfind(char16_t ch, size_type pos = npos) const noexcept;
     constexpr size_type rfind(utf16_char ch, size_type pos = npos) const noexcept;
     constexpr size_type rfind(utf16_string_view sv, size_type pos = npos) const noexcept;
+    constexpr size_type find_last_of(char16_t ch, size_type pos = npos) const noexcept;
+    constexpr size_type find_last_of(utf16_char ch, size_type pos = npos) const noexcept;
+    constexpr size_type find_last_of(utf16_string_view sv, size_type pos = npos) const noexcept;
+    constexpr size_type find_last_not_of(char16_t ch, size_type pos = npos) const noexcept;
+    constexpr size_type find_last_not_of(utf16_char ch, size_type pos = npos) const noexcept;
+    constexpr size_type find_last_not_of(utf16_string_view sv, size_type pos = npos) const noexcept;
 
     constexpr bool is_char_boundary(size_type index) const noexcept;
     constexpr bool is_grapheme_boundary(size_type index) const noexcept;
@@ -1728,9 +1793,15 @@ static_assert(text.char_count() == 3);
 
 `graphemes()` yields `utf16_string_view` values, each covering one default Unicode grapheme cluster.
 
+> [!WARNING]
+> `as_view()`, `chars()`, `reversed_chars()`, `graphemes()`, `char_indices()`, and `grapheme_indices()` all borrow from the underlying UTF-16 storage.
+> Do not keep them after that storage is destroyed or, for owning strings, after mutation.
+
 `grapheme_indices()` yields `(code_unit_offset, utf16_string_view)` pairs.
 
 `grapheme_count()` counts default Unicode grapheme clusters rather than scalar values.
+
+`find_grapheme`, `rfind_grapheme`, and `contains_grapheme` search using grapheme-cluster boundaries rather than only character boundaries. `find_first_of`, `find_first_not_of`, `find_last_of`, and `find_last_not_of` use raw code-unit semantics for `char16_t`, and UTF-16 character semantics for `utf16_char` and `utf16_string_view`.
 
 `find` and `rfind` behave like the UTF-8 variants, but with UTF-16 code-unit indexing and surrogate-pair boundaries.
 
@@ -1812,7 +1883,7 @@ using namespace unicode_ranges::literals;
 const auto owned = u"Aé😀"_utf16_s;
 ```
 
-Cross-encoding is available through `to_utf8()`, including allocator-aware target construction.
+Cross-encoding is available through the direct `utf16_string(utf8_string_view, alloc)` constructor and through `to_utf8()`, both with allocator-aware target construction.
 
 Checked factory construction is also available from raw source text:
 
@@ -1822,6 +1893,11 @@ static constexpr auto from_bytes(std::string_view bytes,
     -> std::expected<basic_utf16_string, utf8_error>;
 static constexpr auto from_bytes(std::wstring_view bytes,
                                  const Allocator& alloc = Allocator()) noexcept;
+```
+
+```cpp
+constexpr basic_utf16_string(utf8_string_view view,
+                             const Allocator& alloc = Allocator());
 ```
 
 Unchecked factory construction from already-valid UTF-16 code units is also allocator-aware:
@@ -1856,9 +1932,13 @@ The owning UTF-16 string supports the same mutation family as `utf8_string`:
 - `replace`
 - `replace_with_range`
 - `push_back`
+- `operator+=`
 - `operator+`
 
 All positions and lengths are UTF-16 code-unit indices, and operations that take boundaries throw `std::out_of_range` when asked to split a surrogate pair.
+
+> [!WARNING]
+> Like `utf8_string`, borrowed results from `as_view()`, `chars()`, `graphemes()`, and related range helpers are tied to the string's internal storage and should not be kept across mutation.
 
 Example:
 
@@ -1919,6 +1999,8 @@ public:
 
     constexpr basic_utf8_string(utf8_string_view view,
                                 const Allocator& alloc = Allocator());
+    constexpr basic_utf8_string(utf16_string_view view,
+                                const Allocator& alloc = Allocator());
     constexpr basic_utf8_string(std::size_t count, utf8_char ch,
                                 const Allocator& alloc = Allocator());
 
@@ -1948,6 +2030,11 @@ public:
     constexpr basic_utf8_string& operator=(utf8_string_view sv);
     constexpr basic_utf8_string& operator=(utf8_char ch);
     constexpr basic_utf8_string& operator=(std::initializer_list<utf8_char> ilist);
+    constexpr basic_utf8_string& operator+=(utf8_string_view sv);
+    constexpr basic_utf8_string& operator+=(utf16_string_view sv);
+    constexpr basic_utf8_string& operator+=(utf8_char ch);
+    constexpr basic_utf8_string& operator+=(utf16_char ch);
+    constexpr basic_utf8_string& operator+=(std::initializer_list<utf8_char> ilist);
 
     constexpr void shrink_to_fit();
     constexpr std::size_t capacity() const;
@@ -2024,6 +2111,7 @@ Construction is available from:
 
 - nothing
 - a validated UTF-8 view
+- a validated UTF-16 view, transcoded into UTF-8
 - checked raw source text carried in `std::string_view` or `std::wstring_view`
 - repeated `utf8_char`
 - ranges of `utf8_char`
@@ -2031,6 +2119,8 @@ Construction is available from:
 - initializer lists of `utf8_char`
 
 `from_bytes(...)` is the ergonomic bridge from `std::string` / `std::wstring` into the validated UTF-8 owning type, and both overloads accept an optional allocator.
+
+Cross-encoding is also available through the direct `utf8_string(utf16_string_view, alloc)` constructor and `to_utf16()`.
 
 ### Modifiers
 
@@ -2181,6 +2271,10 @@ on either side when one operand is an owning `utf8_string`.
 - `operator utf8_string_view()` converts to a view
 - `to_utf16()` transcodes into an owning UTF-16 string, with optional allocator control
 - `data()` and `c_str()` expose the contiguous byte storage
+
+> [!WARNING]
+> `as_view()` and the inherited read-only range helpers such as `chars()` and `graphemes()` borrow from the string's internal storage.
+> They become invalid if the string is destroyed, and they should not be kept across mutation.
 
 Example:
 

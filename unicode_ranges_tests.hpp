@@ -14,7 +14,7 @@
 using namespace unicode_ranges;
 using namespace unicode_ranges::literals;
 
-inline void run_utf8_ranges_tests()
+inline void run_unicode_ranges_tests()
 {
 	// Shared test helpers used by both the UTF-8 and UTF-16 sections.
 	[[maybe_unused]] const auto wide_from_scalar = [](std::uint32_t scalar)
@@ -143,15 +143,27 @@ inline void run_utf8_ranges_tests()
 	static_assert(utf8_text.find("é€"_utf8_sv, 2) == utf8_string_view::npos);
 	static_assert(utf8_text.find("€"_utf8_sv, 2) == 3);
 	static_assert(utf8_text.find("€"_utf8_sv, utf8_string_view::npos) == utf8_string_view::npos);
+	static_assert(utf8_text.find_first_of(static_cast<char8_t>('A')) == 0);
+	static_assert(utf8_text.find_first_of("€A"_utf8_sv) == 0);
+	static_assert(utf8_text.find_first_of("€A"_utf8_sv, 1) == 3);
+	static_assert(utf8_text.find_first_of(u8""_utf8_sv) == utf8_string_view::npos);
 	static_assert(utf8_text.find("é"_u8c, 2) == utf8_string_view::npos);
 	static_assert(utf8_text.find("€"_u8c, 2) == 3);
 	static_assert(utf8_text.find("€"_u8c, utf8_string_view::npos) == utf8_string_view::npos);
 	static_assert(utf8_text.find("é"_u8c) == 1);
 	static_assert(utf8_text.find("€"_u8c) == 3);
 	static_assert(utf8_text.find("Z"_u8c) == utf8_string_view::npos);
+	static_assert(utf8_text.find_first_not_of(static_cast<char8_t>('A')) == 1);
+	static_assert(utf8_text.find_first_not_of("A"_u8c) == 1);
+	static_assert(utf8_text.find_first_not_of("Aé"_utf8_sv) == 3);
+	static_assert(utf8_text.find_first_not_of(u8""_utf8_sv, 2) == 3);
 	static_assert(utf8_text.rfind(static_cast<char8_t>('A')) == 0);
 	static_assert(utf8_text.rfind(static_cast<char8_t>(0xA9), 2) == 2);
 	static_assert(utf8_text.rfind(static_cast<char8_t>('A'), 0) == 0);
+	static_assert(utf8_text.find_last_of(static_cast<char8_t>('A')) == 0);
+	static_assert(utf8_text.find_last_of("€A"_utf8_sv) == 3);
+	static_assert(utf8_text.find_last_of("€A"_utf8_sv, 1) == 0);
+	static_assert(utf8_text.find_last_of(u8""_utf8_sv) == utf8_string_view::npos);
 	static_assert(utf8_text.rfind("é€"_utf8_sv) == 1);
 	static_assert(utf8_text.rfind("é€"_utf8_sv, 2) == 1);
 	static_assert(utf8_text.rfind("€"_utf8_sv, 2) == utf8_string_view::npos);
@@ -160,6 +172,20 @@ inline void run_utf8_ranges_tests()
 	static_assert(utf8_text.rfind("€"_u8c, 2) == utf8_string_view::npos);
 	static_assert(utf8_text.rfind("€"_u8c) == 3);
 	static_assert(utf8_text.rfind("Z"_u8c) == utf8_string_view::npos);
+	static_assert(utf8_text.find_last_not_of(static_cast<char8_t>('A')) == 5);
+	static_assert(utf8_text.find_last_not_of("€"_u8c) == 1);
+	static_assert(utf8_text.find_last_not_of("Aé"_utf8_sv) == 3);
+	static_assert(utf8_text.find_last_not_of(u8""_utf8_sv) == 3);
+	static_assert([] {
+		constexpr auto text = u8"e\u0301🇷🇴!"_utf8_sv;
+		return text.find_grapheme(u8"e\u0301"_grapheme_utf8) == 0
+			&& text.find_grapheme(u8"🇷🇴"_grapheme_utf8, 1) == 3
+			&& text.find_grapheme(u8"\u0301"_u8c) == utf8_string_view::npos
+			&& text.contains_grapheme(u8"🇷🇴"_grapheme_utf8)
+			&& !text.contains_grapheme(u8"\u0301"_u8c)
+			&& text.rfind_grapheme(u8"!"_grapheme_utf8) == 11
+			&& text.rfind_grapheme(u8"🇷🇴"_grapheme_utf8, 10) == 3;
+	}());
 	static_assert(utf8_text.substr(1).has_value());
 	static_assert(utf8_text.substr(1).value() == "é€"_utf8_sv);
 	static_assert(utf8_text.substr(1, 2).value() == "é"_utf8_sv);
@@ -276,6 +302,10 @@ inline void run_utf8_ranges_tests()
 	static_assert(utf16_text.find(static_cast<char16_t>(u'A')) == 0);
 	static_assert(utf16_text.find(static_cast<char16_t>(0xDE00u), 3) == 3);
 	static_assert(utf16_text.find(static_cast<char16_t>(u'A'), utf16_string_view::npos) == utf16_string_view::npos);
+	static_assert(utf16_text.find_first_of(static_cast<char16_t>(u'A')) == 0);
+	static_assert(utf16_text.find_first_of(u"😀A"_utf16_sv) == 0);
+	static_assert(utf16_text.find_first_of(u"😀A"_utf16_sv, 1) == 2);
+	static_assert(utf16_text.find_first_of(u""_utf16_sv) == utf16_string_view::npos);
 	static_assert(utf16_text.find(u"é😀"_utf16_sv) == 1);
 	static_assert(utf16_text.find(u"é😀"_utf16_sv, 2) == utf16_string_view::npos);
 	static_assert(utf16_text.find(u"😀"_utf16_sv, 3) == utf16_string_view::npos);
@@ -284,8 +314,16 @@ inline void run_utf8_ranges_tests()
 	static_assert(utf16_text.find(u"é"_u16c) == 1);
 	static_assert(utf16_text.find(u"😀"_u16c) == 2);
 	static_assert(utf16_text.find(u"Z"_u16c) == utf16_string_view::npos);
+	static_assert(utf16_text.find_first_not_of(static_cast<char16_t>(u'A')) == 1);
+	static_assert(utf16_text.find_first_not_of(u"A"_u16c) == 1);
+	static_assert(utf16_text.find_first_not_of(u"Aé"_utf16_sv) == 2);
+	static_assert(utf16_text.find_first_not_of(u""_utf16_sv, 2) == 2);
 	static_assert(utf16_text.rfind(static_cast<char16_t>(u'A')) == 0);
 	static_assert(utf16_text.rfind(static_cast<char16_t>(0xDE00u), 3) == 3);
+	static_assert(utf16_text.find_last_of(static_cast<char16_t>(u'A')) == 0);
+	static_assert(utf16_text.find_last_of(u"😀A"_utf16_sv) == 2);
+	static_assert(utf16_text.find_last_of(u"😀A"_utf16_sv, 1) == 0);
+	static_assert(utf16_text.find_last_of(u""_utf16_sv) == utf16_string_view::npos);
 	static_assert(utf16_text.rfind(u"é😀"_utf16_sv) == 1);
 	static_assert(utf16_text.rfind(u"é😀"_utf16_sv, 2) == 1);
 	static_assert(utf16_text.rfind(u"😀"_utf16_sv, 1) == utf16_string_view::npos);
@@ -293,6 +331,20 @@ inline void run_utf8_ranges_tests()
 	static_assert(utf16_text.rfind(u"😀"_u16c, 1) == utf16_string_view::npos);
 	static_assert(utf16_text.rfind(u"😀"_u16c) == 2);
 	static_assert(utf16_text.rfind(u"Z"_u16c) == utf16_string_view::npos);
+	static_assert(utf16_text.find_last_not_of(static_cast<char16_t>(u'A')) == 3);
+	static_assert(utf16_text.find_last_not_of(u"😀"_u16c) == 1);
+	static_assert(utf16_text.find_last_not_of(u"Aé"_utf16_sv) == 2);
+	static_assert(utf16_text.find_last_not_of(u""_utf16_sv) == 2);
+	static_assert([] {
+		constexpr auto text = u"e\u0301🇷🇴!"_utf16_sv;
+		return text.find_grapheme(u"e\u0301"_grapheme_utf16) == 0
+			&& text.find_grapheme(u"🇷🇴"_grapheme_utf16, 1) == 2
+			&& text.find_grapheme(u"\u0301"_u16c) == utf16_string_view::npos
+			&& text.contains_grapheme(u"🇷🇴"_grapheme_utf16)
+			&& !text.contains_grapheme(u"\u0301"_u16c)
+			&& text.rfind_grapheme(u"!"_grapheme_utf16) == 6
+			&& text.rfind_grapheme(u"🇷🇴"_grapheme_utf16, 5) == 2;
+	}());
 	static_assert(utf16_text.substr(1).has_value());
 	static_assert(utf16_text.substr(1).value() == u"é😀"_utf16_sv);
 	static_assert(utf16_text.substr(2, 2).value() == u"😀"_utf16_sv);
@@ -598,6 +650,8 @@ inline void run_utf8_ranges_tests()
 	static_assert(std::same_as<decltype(utf8_string{}.get_allocator()), std::allocator<char8_t>>);
 	assert("Aé€"_utf8_s == utf8_text);
 	assert(utf8_string{ utf8_text } == "Aé€"_utf8_s);
+	assert((utf8_string{ u"Aé😀"_utf16_sv } == u8"Aé😀"_utf8_sv));
+	assert((utf8_string{ utf16_string{ u"Aé😀"_utf16_sv } } == u8"Aé😀"_utf8_sv));
 	assert(std::format("{}", utf8_string{ utf8_text }) == "Aé€");
 	{
 		const auto result = utf8_string::from_bytes("Aé😀");
@@ -633,6 +687,14 @@ inline void run_utf8_ranges_tests()
 
 		auto moved_rhs = "A"_utf8_s;
 		assert(rhs + std::move(moved_rhs) == utf8_string(std::from_range, std::array{ e_acute, "A"_u8c }));
+	}
+	{
+		auto appended = "A"_utf8_s;
+		appended += "é"_utf8_sv;
+		appended += u"😀"_utf16_sv;
+		appended += "!"_u8c;
+		appended += u"?"_u16c;
+		assert(appended == u8"Aé😀!?"_utf8_sv);
 	}
 	{
 		const auto reversed = utf8_text.reversed_chars() | std::ranges::to<utf8_string>();
@@ -679,6 +741,8 @@ inline void run_utf8_ranges_tests()
 	static_assert(std::same_as<decltype(utf16_string{}.get_allocator()), std::allocator<char16_t>>);
 	assert(u"Aé😀"_utf16_s == utf16_text);
 	assert(utf16_string{ utf16_text } == u"Aé😀"_utf16_s);
+	assert((utf16_string{ u8"Aé😀"_utf8_sv } == u"Aé😀"_utf16_sv));
+	assert((utf16_string{ utf8_string{ u8"Aé😀"_utf8_sv } } == u"Aé😀"_utf16_sv));
 	assert(std::format("{}", utf16_string{ utf16_text }) == "Aé😀");
 	{
 		const auto result = utf16_string::from_bytes("Aé😀");
@@ -714,6 +778,14 @@ inline void run_utf8_ranges_tests()
 
 		auto moved_rhs = u"A"_utf16_s;
 		assert(rhs + std::move(moved_rhs) == utf16_string(std::from_range, std::array{ e_acute, u"A"_u16c }));
+	}
+	{
+		auto appended = u"A"_utf16_s;
+		appended += u"é"_utf16_sv;
+		appended += u8"😀"_utf8_sv;
+		appended += u"!"_u16c;
+		appended += "?"_u8c;
+		assert(appended == u"Aé😀!?"_utf16_sv);
 	}
 	{
 		utf16_string s;

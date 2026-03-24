@@ -236,6 +236,16 @@ public:
 		return find(sv) != npos;
 	}
 
+	constexpr bool contains_grapheme(utf8_char ch) const noexcept
+	{
+		return find_grapheme(ch) != npos;
+	}
+
+	constexpr bool contains_grapheme(View sv) const noexcept
+	{
+		return find_grapheme(sv) != npos;
+	}
+
 	constexpr size_type find(char8_t ch, size_type pos = 0) const noexcept
 	{
 		pos = (std::min)(size(), pos);
@@ -335,6 +345,84 @@ public:
 		{
 			return byte_view().find(needle, pos);
 		}
+	}
+
+	constexpr size_type find_grapheme(utf8_char ch, size_type pos = 0) const noexcept
+	{
+		return details::find_grapheme(byte_view(), ch.as_view(), pos);
+	}
+
+	constexpr size_type find_grapheme(View sv, size_type pos = 0) const noexcept
+	{
+		return details::find_grapheme(byte_view(), sv.base(), pos);
+	}
+
+	constexpr size_type find_first_of(char8_t ch, size_type pos = 0) const noexcept
+	{
+		return find(ch, pos);
+	}
+
+	constexpr size_type find_first_of(utf8_char ch, size_type pos = 0) const noexcept
+	{
+		return find(ch, pos);
+	}
+
+	constexpr size_type find_first_of(View sv, size_type pos = 0) const noexcept
+	{
+		if (sv.empty())
+		{
+			return npos;
+		}
+
+		pos = ceil_char_boundary((std::min)(size(), pos));
+		auto indices = char_indices();
+		const auto it = std::ranges::find_if(indices, [&](const auto& entry)
+		{
+			const auto [index, current] = entry;
+			return index >= pos && std::ranges::contains(sv.chars(), current);
+		});
+
+		return it == indices.end() ? npos : (*it).first;
+	}
+
+	constexpr size_type find_first_not_of(char8_t ch, size_type pos = 0) const noexcept
+	{
+		pos = (std::min)(size(), pos);
+		for (size_type index = pos; index != size(); ++index)
+		{
+			if (byte_view()[index] != ch)
+			{
+				return index;
+			}
+		}
+
+		return npos;
+	}
+
+	constexpr size_type find_first_not_of(utf8_char ch, size_type pos = 0) const noexcept
+	{
+		pos = ceil_char_boundary((std::min)(size(), pos));
+		auto indices = char_indices();
+		const auto it = std::ranges::find_if(indices, [&](const auto& entry)
+		{
+			const auto [index, current] = entry;
+			return index >= pos && current != ch;
+		});
+
+		return it == indices.end() ? npos : (*it).first;
+	}
+
+	constexpr size_type find_first_not_of(View sv, size_type pos = 0) const noexcept
+	{
+		pos = ceil_char_boundary((std::min)(size(), pos));
+		auto indices = char_indices();
+		const auto it = std::ranges::find_if(indices, [&](const auto& entry)
+		{
+			const auto [index, current] = entry;
+			return index >= pos && !std::ranges::contains(sv.chars(), current);
+		});
+
+		return it == indices.end() ? npos : (*it).first;
 	}
 
 	constexpr size_type rfind(char8_t ch, size_type pos = npos) const noexcept
@@ -446,6 +534,121 @@ public:
 		{
 			return byte_view().rfind(needle, pos);
 		}
+	}
+
+	constexpr size_type rfind_grapheme(utf8_char ch, size_type pos = npos) const noexcept
+	{
+		return details::rfind_grapheme(byte_view(), ch.as_view(), pos);
+	}
+
+	constexpr size_type rfind_grapheme(View sv, size_type pos = npos) const noexcept
+	{
+		return details::rfind_grapheme(byte_view(), sv.base(), pos);
+	}
+
+	constexpr size_type find_last_of(char8_t ch, size_type pos = npos) const noexcept
+	{
+		return rfind(ch, pos);
+	}
+
+	constexpr size_type find_last_of(utf8_char ch, size_type pos = npos) const noexcept
+	{
+		return rfind(ch, pos);
+	}
+
+	constexpr size_type find_last_of(View sv, size_type pos = npos) const noexcept
+	{
+		if (empty() || sv.empty())
+		{
+			return npos;
+		}
+
+		pos = floor_char_boundary((std::min)(size(), pos));
+		size_type result = npos;
+		for (const auto [index, current] : char_indices())
+		{
+			if (index > pos)
+			{
+				break;
+			}
+
+			if (std::ranges::contains(sv.chars(), current))
+			{
+				result = index;
+			}
+		}
+
+		return result;
+	}
+
+	constexpr size_type find_last_not_of(char8_t ch, size_type pos = npos) const noexcept
+	{
+		if (empty())
+		{
+			return npos;
+		}
+
+		pos = (std::min)(size() - 1, pos);
+		for (size_type index = pos + 1; index != 0;)
+		{
+			--index;
+			if (byte_view()[index] != ch)
+			{
+				return index;
+			}
+		}
+
+		return npos;
+	}
+
+	constexpr size_type find_last_not_of(utf8_char ch, size_type pos = npos) const noexcept
+	{
+		if (empty())
+		{
+			return npos;
+		}
+
+		pos = floor_char_boundary((std::min)(size(), pos));
+		size_type result = npos;
+		for (const auto [index, current] : char_indices())
+		{
+			if (index > pos)
+			{
+				break;
+			}
+
+			if (current != ch)
+			{
+				result = index;
+			}
+		}
+
+		return result;
+	}
+
+	constexpr size_type find_last_not_of(View sv, size_type pos = npos) const noexcept
+	{
+		if (empty())
+		{
+			return npos;
+		}
+
+		pos = floor_char_boundary((std::min)(size(), pos));
+		size_type result = npos;
+		for (const auto [index, current] : char_indices())
+		{
+			if (index > pos)
+			{
+				break;
+			}
+
+			if (!std::ranges::contains(sv.chars(), current))
+			{
+				result = index;
+			}
+		}
+
+		return result;
 	}
 
 	constexpr bool is_char_boundary(size_type index) const noexcept

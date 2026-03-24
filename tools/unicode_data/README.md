@@ -19,6 +19,6 @@ Regenerate the checked-in C++ tables with:
 pwsh ./tools/regenerate_unicode_tables.ps1
 ```
 
-The regeneration script writes `utf8_ranges/unicode_tables.hpp` as UTF-8 without BOM so Clang-cl can consume it reliably.
+The regeneration script writes `unicode_ranges/unicode_tables.hpp` as UTF-8 without BOM so Clang-cl can consume it reliably.
 
 The Rust generator accepts an optional custom data-root argument if you want to point it at a different checked-out Unicode dataset.

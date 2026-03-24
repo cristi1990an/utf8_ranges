@@ -1,6 +1,6 @@
-#include "utf8_ranges_tests.hpp"
+#include "unicode_ranges_tests.hpp"
 
 int main()
 {
-	run_utf8_ranges_tests();
+	run_unicode_ranges_tests();
 }

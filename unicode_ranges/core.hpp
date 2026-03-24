@@ -880,6 +880,96 @@ namespace details
 			return floor_grapheme_boundary(text, index) == index;
 		}
 
+		template <typename CharT>
+		inline constexpr bool grapheme_match_at(
+			std::basic_string_view<CharT> text,
+			std::basic_string_view<CharT> needle,
+			std::size_t index) noexcept
+		{
+			if (needle.size() > text.size() - index)
+			{
+				return false;
+			}
+
+			for (std::size_t needle_index = 0; needle_index != needle.size(); ++needle_index)
+			{
+				if (text[index + needle_index] != needle[needle_index])
+				{
+					return false;
+				}
+			}
+
+			return is_grapheme_boundary(text, index + needle.size());
+		}
+
+		template <typename CharT>
+		inline constexpr std::size_t find_grapheme(
+			std::basic_string_view<CharT> text,
+			std::basic_string_view<CharT> needle,
+			std::size_t pos = std::basic_string_view<CharT>::npos) noexcept
+		{
+			pos = ceil_grapheme_boundary(text, (std::min)(text.size(), pos));
+			if (needle.empty())
+			{
+				return pos;
+			}
+
+			if (needle.size() > text.size() - pos)
+			{
+				return std::basic_string_view<CharT>::npos;
+			}
+
+			for (std::size_t current = pos; current + needle.size() <= text.size(); current = next_grapheme_boundary(text, current))
+			{
+				if (grapheme_match_at(text, needle, current))
+				{
+					return current;
+				}
+			}
+
+			return std::basic_string_view<CharT>::npos;
+		}
+
+		template <typename CharT>
+		inline constexpr std::size_t rfind_grapheme(
+			std::basic_string_view<CharT> text,
+			std::basic_string_view<CharT> needle,
+			std::size_t pos = std::basic_string_view<CharT>::npos) noexcept
+		{
+			pos = floor_grapheme_boundary(text, (std::min)(text.size(), pos));
+			if (needle.empty())
+			{
+				return pos;
+			}
+
+			if (needle.size() > text.size())
+			{
+				return std::basic_string_view<CharT>::npos;
+			}
+
+			const auto last_start = floor_grapheme_boundary(text, text.size() - needle.size());
+			pos = (std::min)(pos, last_start);
+
+			std::size_t result = std::basic_string_view<CharT>::npos;
+			for (std::size_t current = 0; current <= pos;)
+			{
+				if (grapheme_match_at(text, needle, current))
+				{
+					result = current;
+				}
+
+				const auto next = next_grapheme_boundary(text, current);
+				if (next > pos || next <= current)
+				{
+					break;
+				}
+
+				current = next;
+			}
+
+			return result;
+		}
+
 		namespace literals
 		{
 		template<typename CharT, std::size_t N>

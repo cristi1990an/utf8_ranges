@@ -131,6 +131,8 @@ public:
 		: base_(view.base(), alloc)
 	{}
 
+	constexpr basic_utf8_string(utf16_string_view view, const Allocator& alloc = Allocator());
+
 	constexpr basic_utf8_string(std::size_t count, utf8_char ch, const Allocator& alloc = Allocator())
 		: base_(alloc)
 	{
@@ -256,6 +258,30 @@ public:
 	constexpr basic_utf8_string& operator=(std::initializer_list<utf8_char> ilist)
 	{
 		return assign(ilist);
+	}
+
+	constexpr basic_utf8_string& operator+=(utf8_string_view sv)
+	{
+		return append(sv);
+	}
+
+	constexpr basic_utf8_string& operator+=(utf16_string_view sv);
+
+	constexpr basic_utf8_string& operator+=(utf8_char ch)
+	{
+		push_back(ch);
+		return *this;
+	}
+
+	constexpr basic_utf8_string& operator+=(utf16_char ch)
+	{
+		push_back(static_cast<utf8_char>(ch));
+		return *this;
+	}
+
+	constexpr basic_utf8_string& operator+=(std::initializer_list<utf8_char> ilist)
+	{
+		return append(ilist);
 	}
 
 	constexpr void shrink_to_fit()

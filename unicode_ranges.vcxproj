@@ -72,6 +72,10 @@
   <PropertyGroup>
     <TreatWarningAsError Condition="'$(TreatWarningAsError)'==''">false</TreatWarningAsError>
   </PropertyGroup>
+  <PropertyGroup>
+    <OutDir>$(Platform)\$(Configuration)\</OutDir>
+    <IntDir>build_artifacts\$(Platform)\$(Configuration)\</IntDir>
+  </PropertyGroup>
   <PropertyGroup Label="UserMacros" />
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
@@ -142,23 +146,22 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="utf8_ranges\core.hpp" />
-    <ClInclude Include="utf8_ranges\string.hpp" />
-    <ClInclude Include="utf8_ranges\utf8_string_crtp.hpp" />
-    <ClInclude Include="utf8_ranges\utf8_string_view.hpp" />
-    <ClInclude Include="utf8_ranges\utf8_string.hpp" />
-    <ClInclude Include="utf8_ranges\unicode_tables.hpp" />
-    <ClInclude Include="utf8_ranges_tests.hpp" />
-    <ClInclude Include="utf8_ranges\utf16_char.hpp" />
-    <ClInclude Include="utf8_ranges\utf16_string_crtp.hpp" />
-    <ClInclude Include="utf8_ranges\utf16_string_view.hpp" />
-    <ClInclude Include="utf8_ranges\utf16_string.hpp" />
-    <ClInclude Include="utf8_ranges\utf8_char.hpp" />
-    <ClInclude Include="utf8_ranges\grapheme_cluster_view.hpp" />
-    <ClInclude Include="utf8_ranges.hpp" />
+    <ClInclude Include="unicode_ranges\core.hpp" />
+    <ClInclude Include="unicode_ranges\string.hpp" />
+    <ClInclude Include="unicode_ranges\utf8_string_crtp.hpp" />
+    <ClInclude Include="unicode_ranges\utf8_string_view.hpp" />
+    <ClInclude Include="unicode_ranges\utf8_string.hpp" />
+    <ClInclude Include="unicode_ranges\unicode_tables.hpp" />
+    <ClInclude Include="unicode_ranges_tests.hpp" />
+    <ClInclude Include="unicode_ranges\utf16_char.hpp" />
+    <ClInclude Include="unicode_ranges\utf16_string_crtp.hpp" />
+    <ClInclude Include="unicode_ranges\utf16_string_view.hpp" />
+    <ClInclude Include="unicode_ranges\utf16_string.hpp" />
+    <ClInclude Include="unicode_ranges\utf8_char.hpp" />
+    <ClInclude Include="unicode_ranges\grapheme_cluster_view.hpp" />
     <ClInclude Include="unicode_ranges.hpp" />
-    <ClInclude Include="utf8_ranges\utf16_views.hpp" />
-    <ClInclude Include="utf8_ranges\utf8_views.hpp" />
+    <ClInclude Include="unicode_ranges\utf16_views.hpp" />
+    <ClInclude Include="unicode_ranges\utf8_views.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="source.cpp" />

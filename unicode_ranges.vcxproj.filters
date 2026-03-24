@@ -15,37 +15,34 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="utf8_ranges\core.hpp">
+    <ClInclude Include="unicode_ranges\core.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="utf8_ranges\string.hpp">
+    <ClInclude Include="unicode_ranges\string.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="utf8_ranges\unicode_tables.hpp">
+    <ClInclude Include="unicode_ranges\unicode_tables.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="utf8_ranges_tests.hpp">
+    <ClInclude Include="unicode_ranges_tests.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="utf8_ranges\utf8_char.hpp">
+    <ClInclude Include="unicode_ranges\utf8_char.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="utf8_ranges\utf16_char.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="utf8_ranges.hpp">
+    <ClInclude Include="unicode_ranges\utf16_char.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="unicode_ranges.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="utf8_ranges\grapheme_cluster_view.hpp">
+    <ClInclude Include="unicode_ranges\grapheme_cluster_view.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="utf8_ranges\utf16_views.hpp">
+    <ClInclude Include="unicode_ranges\utf16_views.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="utf8_ranges\utf8_views.hpp">
+    <ClInclude Include="unicode_ranges\utf8_views.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
