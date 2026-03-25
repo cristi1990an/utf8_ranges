@@ -1873,4 +1873,30 @@ protected:
 
 }
 
+namespace std::ranges
+{
+	template <>
+	inline constexpr bool enable_borrowed_range<unicode_ranges::details::utf16_char_indices_view> = true;
+
+	template <typename View>
+	inline constexpr bool enable_borrowed_range<unicode_ranges::details::utf16_grapheme_indices_view<View>> = true;
+
+	template <typename View, bool DropTrailingEmpty>
+	inline constexpr bool enable_borrowed_range<
+		unicode_ranges::details::basic_utf16_split_view<
+			View,
+			DropTrailingEmpty,
+			unicode_ranges::details::borrowed_utf16_split_delimiter>> = true;
+
+	template <typename View, bool Reverse>
+	inline constexpr bool enable_borrowed_range<
+		unicode_ranges::details::basic_utf16_splitn_view<
+			View,
+			Reverse,
+			unicode_ranges::details::borrowed_utf16_split_delimiter>> = true;
+
+	template <typename View, bool AsciiOnly>
+	inline constexpr bool enable_borrowed_range<unicode_ranges::details::utf16_whitespace_split_view<View, AsciiOnly>> = true;
+}
+
 #endif // UTF8_RANGES_UTF16_STRING_CRTP_HPP

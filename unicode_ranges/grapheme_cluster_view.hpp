@@ -247,7 +247,7 @@ namespace views
 			std::size_t next_ = 0;
 		};
 
-		constexpr iterator begin() const
+		constexpr iterator begin() noexcept
 		{
 			if (base_.empty())
 			{
@@ -276,7 +276,7 @@ namespace views
 			: base_(base)
 		{}
 
-		void ensure_runtime_boundaries() const
+		void ensure_runtime_boundaries()
 		{
 			if (!boundaries_.empty())
 			{
@@ -291,7 +291,7 @@ namespace views
 		}
 
 		std::basic_string_view<CharT> base_{};
-		mutable std::vector<std::size_t> boundaries_{};
+		std::vector<std::size_t> boundaries_{};
 	};
 }
 
@@ -362,6 +362,12 @@ namespace literals
 	}
 }
 
+}
+
+namespace std::ranges
+{
+	template <typename CharT>
+	inline constexpr bool enable_borrowed_range<unicode_ranges::views::grapheme_cluster_view<CharT>> = true;
 }
 
 #endif // UTF8_RANGES_GRAPHEME_CLUSTER_VIEW_HPP

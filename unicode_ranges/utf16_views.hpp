@@ -368,4 +368,16 @@ namespace views
 
 }
 
+namespace std::ranges
+{
+	template <>
+	inline constexpr bool enable_borrowed_range<unicode_ranges::views::utf16_view> = true;
+
+	template <>
+	inline constexpr bool enable_borrowed_range<unicode_ranges::views::reversed_utf16_view> = true;
+
+	template <typename CharT>
+	inline constexpr bool enable_borrowed_range<unicode_ranges::views::lossy_utf16_view<CharT>> = true;
+}
+
 #endif // UTF8_RANGES_UTF16_VIEWS_HPP
