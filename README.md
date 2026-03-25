@@ -1059,6 +1059,50 @@ public:
     constexpr size_type char_count() const noexcept;
     constexpr auto split(utf8_char ch) const noexcept;
     constexpr auto split(utf8_string_view sv) const noexcept;
+    constexpr auto rsplit(utf8_char ch) const noexcept;
+    constexpr auto rsplit(utf8_string_view sv) const noexcept;
+    constexpr auto split_terminator(utf8_char ch) const noexcept;
+    constexpr auto split_terminator(utf8_string_view sv) const noexcept;
+    constexpr auto rsplit_terminator(utf8_char ch) const noexcept;
+    constexpr auto rsplit_terminator(utf8_string_view sv) const noexcept;
+    constexpr auto splitn(size_type count, utf8_char ch) const noexcept;
+    constexpr auto splitn(size_type count, utf8_string_view sv) const noexcept;
+    constexpr auto rsplitn(size_type count, utf8_char ch) const noexcept;
+    constexpr auto rsplitn(size_type count, utf8_string_view sv) const noexcept;
+    constexpr std::optional<std::pair<utf8_string_view, utf8_string_view>>
+        split_once(utf8_char ch) const noexcept;
+    constexpr std::optional<std::pair<utf8_string_view, utf8_string_view>>
+        split_once(utf8_string_view sv) const noexcept;
+    constexpr std::optional<std::pair<utf8_string_view, utf8_string_view>>
+        rsplit_once(utf8_char ch) const noexcept;
+    constexpr std::optional<std::pair<utf8_string_view, utf8_string_view>>
+        rsplit_once(utf8_string_view sv) const noexcept;
+    constexpr auto split_whitespace() const noexcept;
+    constexpr auto split_ascii_whitespace() const noexcept;
+    constexpr std::optional<utf8_string_view> strip_prefix(utf8_char ch) const noexcept;
+    constexpr std::optional<utf8_string_view> strip_prefix(utf8_string_view sv) const noexcept;
+    constexpr std::optional<utf8_string_view> strip_suffix(utf8_char ch) const noexcept;
+    constexpr std::optional<utf8_string_view> strip_suffix(utf8_string_view sv) const noexcept;
+    constexpr std::optional<utf8_string_view>
+        strip_circumfix(utf8_char prefix, utf8_char suffix) const noexcept;
+    constexpr std::optional<utf8_string_view>
+        strip_circumfix(utf8_string_view prefix, utf8_string_view suffix) const noexcept;
+    constexpr utf8_string_view trim_prefix(utf8_char ch) const noexcept;
+    constexpr utf8_string_view trim_prefix(utf8_string_view sv) const noexcept;
+    constexpr utf8_string_view trim_suffix(utf8_char ch) const noexcept;
+    constexpr utf8_string_view trim_suffix(utf8_string_view sv) const noexcept;
+    constexpr utf8_string_view trim_start_matches(utf8_char ch) const noexcept;
+    constexpr utf8_string_view trim_start_matches(utf8_string_view sv) const noexcept;
+    constexpr utf8_string_view trim_end_matches(utf8_char ch) const noexcept;
+    constexpr utf8_string_view trim_end_matches(utf8_string_view sv) const noexcept;
+    constexpr utf8_string_view trim_matches(utf8_char ch) const noexcept;
+    constexpr utf8_string_view trim_matches(utf8_string_view sv) const noexcept;
+    constexpr utf8_string_view trim_start() const noexcept;
+    constexpr utf8_string_view trim_end() const noexcept;
+    constexpr utf8_string_view trim() const noexcept;
+    constexpr utf8_string_view trim_ascii_start() const noexcept;
+    constexpr utf8_string_view trim_ascii_end() const noexcept;
+    constexpr utf8_string_view trim_ascii() const noexcept;
     constexpr std::optional<std::pair<utf8_string_view, utf8_string_view>>
         split_once_at(size_type delim) const noexcept;
     constexpr std::pair<utf8_string_view, utf8_string_view>
@@ -1487,6 +1531,177 @@ Complexity:
 
 - Constant to construct the view
 
+#### `rsplit`
+
+```cpp
+constexpr auto rsplit(utf8_char ch) const noexcept;
+constexpr auto rsplit(utf8_string_view sv) const noexcept;
+```
+
+Returns the same lazy split segments as `split(...)`, but in reverse order.
+
+The delimiter is not included in the yielded segments.
+
+Complexity:
+
+- Constant to construct the view
+
+#### `split_terminator`, `rsplit_terminator`
+
+```cpp
+constexpr auto split_terminator(utf8_char ch) const noexcept;
+constexpr auto split_terminator(utf8_string_view sv) const noexcept;
+constexpr auto rsplit_terminator(utf8_char ch) const noexcept;
+constexpr auto rsplit_terminator(utf8_string_view sv) const noexcept;
+```
+
+Returns lazy split views like `split(...)` and `rsplit(...)`, but suppresses the final empty segment that would otherwise be produced by a trailing delimiter.
+
+Leading empty segments and interior empty segments are preserved.
+
+Complexity:
+
+- Constant to construct the view
+
+#### `splitn`, `rsplitn`
+
+```cpp
+constexpr auto splitn(size_type count, utf8_char ch) const noexcept;
+constexpr auto splitn(size_type count, utf8_string_view sv) const noexcept;
+constexpr auto rsplitn(size_type count, utf8_char ch) const noexcept;
+constexpr auto rsplitn(size_type count, utf8_string_view sv) const noexcept;
+```
+
+Returns a lazy split view that yields at most `count` segments.
+
+`splitn(...)` counts from the front. `rsplitn(...)` counts from the back.
+
+If `count == 0`, the view is empty.
+
+Complexity:
+
+- Constant to construct the view
+
+#### `split_once`, `rsplit_once`
+
+```cpp
+constexpr std::optional<std::pair<utf8_string_view, utf8_string_view>>
+    split_once(utf8_char ch) const noexcept;
+constexpr std::optional<std::pair<utf8_string_view, utf8_string_view>>
+    split_once(utf8_string_view sv) const noexcept;
+constexpr std::optional<std::pair<utf8_string_view, utf8_string_view>>
+    rsplit_once(utf8_char ch) const noexcept;
+constexpr std::optional<std::pair<utf8_string_view, utf8_string_view>>
+    rsplit_once(utf8_string_view sv) const noexcept;
+```
+
+Returns the prefix and suffix around the first or last delimiter occurrence.
+
+The delimiter is not included in the returned views.
+
+Returns `std::nullopt` if the delimiter is not found.
+
+#### Split delimiter rules
+
+For the split family above:
+
+- empty delimiters are treated as `"not found"`
+- `split(...)`, `rsplit(...)`, `split_terminator(...)`, `rsplit_terminator(...)`, `splitn(...)`, and `rsplitn(...)` therefore yield the whole string once when `count != 0`
+- `split_once(...)` and `rsplit_once(...)` return `std::nullopt` for empty delimiters
+
+Complexity:
+
+- `split_once(...)`, `rsplit_once(...)`: linear in `size()`
+
+#### `split_whitespace`, `split_ascii_whitespace`
+
+```cpp
+constexpr auto split_whitespace() const noexcept;
+constexpr auto split_ascii_whitespace() const noexcept;
+```
+
+Returns lazy views of the non-empty segments separated by Unicode whitespace or ASCII whitespace.
+
+Whitespace runs are collapsed and not yielded.
+
+Complexity:
+
+- Constant to construct the view
+
+#### `strip_prefix`, `strip_suffix`, `strip_circumfix`
+
+```cpp
+constexpr std::optional<utf8_string_view> strip_prefix(utf8_char ch) const noexcept;
+constexpr std::optional<utf8_string_view> strip_prefix(utf8_string_view sv) const noexcept;
+constexpr std::optional<utf8_string_view> strip_suffix(utf8_char ch) const noexcept;
+constexpr std::optional<utf8_string_view> strip_suffix(utf8_string_view sv) const noexcept;
+constexpr std::optional<utf8_string_view>
+    strip_circumfix(utf8_char prefix, utf8_char suffix) const noexcept;
+constexpr std::optional<utf8_string_view>
+    strip_circumfix(utf8_string_view prefix, utf8_string_view suffix) const noexcept;
+```
+
+Returns the remaining view after removing a matching prefix, suffix, or prefix-and-suffix pair.
+
+Returns `std::nullopt` if the requested affix is not present.
+
+Complexity:
+
+- Constant for `utf8_char`
+- Linear in the affix length for `utf8_string_view`
+
+#### `trim_prefix`, `trim_suffix`
+
+```cpp
+constexpr utf8_string_view trim_prefix(utf8_char ch) const noexcept;
+constexpr utf8_string_view trim_prefix(utf8_string_view sv) const noexcept;
+constexpr utf8_string_view trim_suffix(utf8_char ch) const noexcept;
+constexpr utf8_string_view trim_suffix(utf8_string_view sv) const noexcept;
+```
+
+Like `strip_prefix(...)` and `strip_suffix(...)`, but returns the original view unchanged when the affix is not present.
+
+Complexity:
+
+- Constant for `utf8_char`
+- Linear in the affix length for `utf8_string_view`
+
+#### `trim_start_matches`, `trim_end_matches`, `trim_matches`
+
+```cpp
+constexpr utf8_string_view trim_start_matches(utf8_char ch) const noexcept;
+constexpr utf8_string_view trim_start_matches(utf8_string_view sv) const noexcept;
+constexpr utf8_string_view trim_end_matches(utf8_char ch) const noexcept;
+constexpr utf8_string_view trim_end_matches(utf8_string_view sv) const noexcept;
+constexpr utf8_string_view trim_matches(utf8_char ch) const noexcept;
+constexpr utf8_string_view trim_matches(utf8_string_view sv) const noexcept;
+```
+
+Removes repeated matching characters or repeated matching string views from the start, end, or both ends.
+
+Empty string-view patterns are a no-op.
+
+Complexity:
+
+- Linear in `size()`
+
+#### `trim_start`, `trim_end`, `trim`, `trim_ascii_start`, `trim_ascii_end`, `trim_ascii`
+
+```cpp
+constexpr utf8_string_view trim_start() const noexcept;
+constexpr utf8_string_view trim_end() const noexcept;
+constexpr utf8_string_view trim() const noexcept;
+constexpr utf8_string_view trim_ascii_start() const noexcept;
+constexpr utf8_string_view trim_ascii_end() const noexcept;
+constexpr utf8_string_view trim_ascii() const noexcept;
+```
+
+Trims Unicode whitespace or ASCII whitespace from the start, end, or both ends.
+
+Complexity:
+
+- Linear in `size()`
+
 #### `split_once_at`
 
 ```cpp
@@ -1904,6 +2119,50 @@ public:
     constexpr size_type char_count() const noexcept;
     constexpr auto split(utf16_char ch) const noexcept;
     constexpr auto split(utf16_string_view sv) const noexcept;
+    constexpr auto rsplit(utf16_char ch) const noexcept;
+    constexpr auto rsplit(utf16_string_view sv) const noexcept;
+    constexpr auto split_terminator(utf16_char ch) const noexcept;
+    constexpr auto split_terminator(utf16_string_view sv) const noexcept;
+    constexpr auto rsplit_terminator(utf16_char ch) const noexcept;
+    constexpr auto rsplit_terminator(utf16_string_view sv) const noexcept;
+    constexpr auto splitn(size_type count, utf16_char ch) const noexcept;
+    constexpr auto splitn(size_type count, utf16_string_view sv) const noexcept;
+    constexpr auto rsplitn(size_type count, utf16_char ch) const noexcept;
+    constexpr auto rsplitn(size_type count, utf16_string_view sv) const noexcept;
+    constexpr std::optional<std::pair<utf16_string_view, utf16_string_view>>
+        split_once(utf16_char ch) const noexcept;
+    constexpr std::optional<std::pair<utf16_string_view, utf16_string_view>>
+        split_once(utf16_string_view sv) const noexcept;
+    constexpr std::optional<std::pair<utf16_string_view, utf16_string_view>>
+        rsplit_once(utf16_char ch) const noexcept;
+    constexpr std::optional<std::pair<utf16_string_view, utf16_string_view>>
+        rsplit_once(utf16_string_view sv) const noexcept;
+    constexpr auto split_whitespace() const noexcept;
+    constexpr auto split_ascii_whitespace() const noexcept;
+    constexpr std::optional<utf16_string_view> strip_prefix(utf16_char ch) const noexcept;
+    constexpr std::optional<utf16_string_view> strip_prefix(utf16_string_view sv) const noexcept;
+    constexpr std::optional<utf16_string_view> strip_suffix(utf16_char ch) const noexcept;
+    constexpr std::optional<utf16_string_view> strip_suffix(utf16_string_view sv) const noexcept;
+    constexpr std::optional<utf16_string_view>
+        strip_circumfix(utf16_char prefix, utf16_char suffix) const noexcept;
+    constexpr std::optional<utf16_string_view>
+        strip_circumfix(utf16_string_view prefix, utf16_string_view suffix) const noexcept;
+    constexpr utf16_string_view trim_prefix(utf16_char ch) const noexcept;
+    constexpr utf16_string_view trim_prefix(utf16_string_view sv) const noexcept;
+    constexpr utf16_string_view trim_suffix(utf16_char ch) const noexcept;
+    constexpr utf16_string_view trim_suffix(utf16_string_view sv) const noexcept;
+    constexpr utf16_string_view trim_start_matches(utf16_char ch) const noexcept;
+    constexpr utf16_string_view trim_start_matches(utf16_string_view sv) const noexcept;
+    constexpr utf16_string_view trim_end_matches(utf16_char ch) const noexcept;
+    constexpr utf16_string_view trim_end_matches(utf16_string_view sv) const noexcept;
+    constexpr utf16_string_view trim_matches(utf16_char ch) const noexcept;
+    constexpr utf16_string_view trim_matches(utf16_string_view sv) const noexcept;
+    constexpr utf16_string_view trim_start() const noexcept;
+    constexpr utf16_string_view trim_end() const noexcept;
+    constexpr utf16_string_view trim() const noexcept;
+    constexpr utf16_string_view trim_ascii_start() const noexcept;
+    constexpr utf16_string_view trim_ascii_end() const noexcept;
+    constexpr utf16_string_view trim_ascii() const noexcept;
     constexpr std::optional<std::pair<utf16_string_view, utf16_string_view>>
         split_once_at(size_type delim) const noexcept;
     constexpr std::pair<utf16_string_view, utf16_string_view>
@@ -1979,6 +2238,192 @@ static_assert(text.char_count() == 3);
 
 `find` and `rfind` behave like the UTF-8 variants, but with UTF-16 code-unit indexing and surrogate-pair boundaries.
 
+#### `split`
+
+```cpp
+constexpr auto split(utf16_char ch) const noexcept;
+constexpr auto split(utf16_string_view sv) const noexcept;
+```
+
+Returns a lazy view of the segments separated by `ch` or `sv`.
+
+The delimiter is not included in the yielded segments.
+
+Complexity:
+
+- Constant to construct the view
+
+#### `rsplit`
+
+```cpp
+constexpr auto rsplit(utf16_char ch) const noexcept;
+constexpr auto rsplit(utf16_string_view sv) const noexcept;
+```
+
+Returns the same lazy split segments as `split(...)`, but in reverse order.
+
+The delimiter is not included in the yielded segments.
+
+Complexity:
+
+- Constant to construct the view
+
+#### `split_terminator`, `rsplit_terminator`
+
+```cpp
+constexpr auto split_terminator(utf16_char ch) const noexcept;
+constexpr auto split_terminator(utf16_string_view sv) const noexcept;
+constexpr auto rsplit_terminator(utf16_char ch) const noexcept;
+constexpr auto rsplit_terminator(utf16_string_view sv) const noexcept;
+```
+
+Returns lazy split views like `split(...)` and `rsplit(...)`, but suppresses the final empty segment that would otherwise be produced by a trailing delimiter.
+
+Leading empty segments and interior empty segments are preserved.
+
+Complexity:
+
+- Constant to construct the view
+
+#### `splitn`, `rsplitn`
+
+```cpp
+constexpr auto splitn(size_type count, utf16_char ch) const noexcept;
+constexpr auto splitn(size_type count, utf16_string_view sv) const noexcept;
+constexpr auto rsplitn(size_type count, utf16_char ch) const noexcept;
+constexpr auto rsplitn(size_type count, utf16_string_view sv) const noexcept;
+```
+
+Returns a lazy split view that yields at most `count` segments.
+
+`splitn(...)` counts from the front. `rsplitn(...)` counts from the back.
+
+If `count == 0`, the view is empty.
+
+Complexity:
+
+- Constant to construct the view
+
+#### `split_once`, `rsplit_once`
+
+```cpp
+constexpr std::optional<std::pair<utf16_string_view, utf16_string_view>>
+    split_once(utf16_char ch) const noexcept;
+constexpr std::optional<std::pair<utf16_string_view, utf16_string_view>>
+    split_once(utf16_string_view sv) const noexcept;
+constexpr std::optional<std::pair<utf16_string_view, utf16_string_view>>
+    rsplit_once(utf16_char ch) const noexcept;
+constexpr std::optional<std::pair<utf16_string_view, utf16_string_view>>
+    rsplit_once(utf16_string_view sv) const noexcept;
+```
+
+Returns the prefix and suffix around the first or last delimiter occurrence.
+
+The delimiter is not included in the returned views.
+
+Returns `std::nullopt` if the delimiter is not found.
+
+#### Split delimiter rules
+
+For the split family above:
+
+- empty delimiters are treated as `"not found"`
+- `split(...)`, `rsplit(...)`, `split_terminator(...)`, `rsplit_terminator(...)`, `splitn(...)`, and `rsplitn(...)` therefore yield the whole string once when `count != 0`
+- `split_once(...)` and `rsplit_once(...)` return `std::nullopt` for empty delimiters
+
+Complexity:
+
+- `split_once(...)`, `rsplit_once(...)`: linear in `size()`
+
+#### `split_whitespace`, `split_ascii_whitespace`
+
+```cpp
+constexpr auto split_whitespace() const noexcept;
+constexpr auto split_ascii_whitespace() const noexcept;
+```
+
+Returns lazy views of the non-empty segments separated by Unicode whitespace or ASCII whitespace.
+
+Whitespace runs are collapsed and not yielded.
+
+Complexity:
+
+- Constant to construct the view
+
+#### `strip_prefix`, `strip_suffix`, `strip_circumfix`
+
+```cpp
+constexpr std::optional<utf16_string_view> strip_prefix(utf16_char ch) const noexcept;
+constexpr std::optional<utf16_string_view> strip_prefix(utf16_string_view sv) const noexcept;
+constexpr std::optional<utf16_string_view> strip_suffix(utf16_char ch) const noexcept;
+constexpr std::optional<utf16_string_view> strip_suffix(utf16_string_view sv) const noexcept;
+constexpr std::optional<utf16_string_view>
+    strip_circumfix(utf16_char prefix, utf16_char suffix) const noexcept;
+constexpr std::optional<utf16_string_view>
+    strip_circumfix(utf16_string_view prefix, utf16_string_view suffix) const noexcept;
+```
+
+Returns the remaining view after removing a matching prefix, suffix, or prefix-and-suffix pair.
+
+Returns `std::nullopt` if the requested affix is not present.
+
+Complexity:
+
+- Constant for `utf16_char`
+- Linear in the affix length for `utf16_string_view`
+
+#### `trim_prefix`, `trim_suffix`
+
+```cpp
+constexpr utf16_string_view trim_prefix(utf16_char ch) const noexcept;
+constexpr utf16_string_view trim_prefix(utf16_string_view sv) const noexcept;
+constexpr utf16_string_view trim_suffix(utf16_char ch) const noexcept;
+constexpr utf16_string_view trim_suffix(utf16_string_view sv) const noexcept;
+```
+
+Like `strip_prefix(...)` and `strip_suffix(...)`, but returns the original view unchanged when the affix is not present.
+
+Complexity:
+
+- Constant for `utf16_char`
+- Linear in the affix length for `utf16_string_view`
+
+#### `trim_start_matches`, `trim_end_matches`, `trim_matches`
+
+```cpp
+constexpr utf16_string_view trim_start_matches(utf16_char ch) const noexcept;
+constexpr utf16_string_view trim_start_matches(utf16_string_view sv) const noexcept;
+constexpr utf16_string_view trim_end_matches(utf16_char ch) const noexcept;
+constexpr utf16_string_view trim_end_matches(utf16_string_view sv) const noexcept;
+constexpr utf16_string_view trim_matches(utf16_char ch) const noexcept;
+constexpr utf16_string_view trim_matches(utf16_string_view sv) const noexcept;
+```
+
+Removes repeated matching characters or repeated matching string views from the start, end, or both ends.
+
+Empty string-view patterns are a no-op.
+
+Complexity:
+
+- Linear in `size()`
+
+#### `trim_start`, `trim_end`, `trim`, `trim_ascii_start`, `trim_ascii_end`, `trim_ascii`
+
+```cpp
+constexpr utf16_string_view trim_start() const noexcept;
+constexpr utf16_string_view trim_end() const noexcept;
+constexpr utf16_string_view trim() const noexcept;
+constexpr utf16_string_view trim_ascii_start() const noexcept;
+constexpr utf16_string_view trim_ascii_end() const noexcept;
+constexpr utf16_string_view trim_ascii() const noexcept;
+```
+
+Trims Unicode whitespace or ASCII whitespace from the start, end, or both ends.
+
+Complexity:
+
+- Linear in `size()`
+
 `front()` and `back()` return `std::optional<utf16_char>`. Use `front_unchecked()` and `back_unchecked()` only when the view is known to be non-empty.
 
 `to_utf8()` materializes the same text as an owning UTF-8 string by transcoding through Unicode scalar values. By default this returns `utf8_string`, but you can supply a different allocator and get `basic_utf8_string<Allocator>`.
@@ -1992,7 +2437,11 @@ Complexity:
 - `find_first_of(...)`, `find_first_not_of(...)`, `find_last_of(...)`, and `find_last_not_of(...)`: linear in `size()` for `char16_t` / `utf16_char`, and linear in `size() * sv.char_count()` for `utf16_string_view` in the worst case
 - `grapheme_count()`, `is_grapheme_boundary()`, `ceil_grapheme_boundary()`, `floor_grapheme_boundary()`, `grapheme_at()`, and `grapheme_substr()`: linear in the number of grapheme clusters examined
 - `char_count()`: linear in the number of characters
-- `is_char_boundary()`, `char_at()`, `char_at_unchecked()`, `split()`, `split_once_at()`, `split_once_at_unchecked()`, `front()`, and `back()`: constant
+- `is_char_boundary()`, `char_at()`, `char_at_unchecked()`, `split()`, `rsplit()`, `split_terminator()`, `rsplit_terminator()`, `splitn()`, `rsplitn()`, `split_once_at()`, `split_once_at_unchecked()`, `front()`, and `back()`: constant to construct or constant to execute
+- `split_once(...)` and `rsplit_once(...)`: linear in `size()`
+- `split_whitespace()` and `split_ascii_whitespace()`: constant to construct, linear to iterate
+- `strip_prefix()`, `strip_suffix()`, `trim_prefix()`, and `trim_suffix()`: constant for single-character overloads, linear in the affix length for `utf16_string_view`
+- `strip_circumfix()`, `trim_matches()`, `trim_start_matches()`, `trim_end_matches()`, `trim()`, `trim_start()`, `trim_end()`, `trim_ascii()`, `trim_ascii_start()`, and `trim_ascii_end()`: linear in `size()`
 - `starts_with(...)` and `ends_with(...)`: constant for single-code-unit and single-character overloads, linear in `sv.size()` for `utf16_string_view`
 - `to_utf8()`: linear in `size()`
 
@@ -2138,7 +2587,7 @@ The owning UTF-16 string supports the same mutation family as `utf8_string`:
 - `operator+=`
 - `operator+`
 
-All positions and lengths are UTF-16 code-unit indices. Mutating operations throw `std::out_of_range` when asked to split a surrogate pair, while query-style operations such as `split_once_at()`, `char_at()`, `substr()`, and `grapheme_substr()` report failure with `std::optional`.
+All positions and lengths are UTF-16 code-unit indices. Mutating operations throw `std::out_of_range` when asked to split a surrogate pair, while query-style operations such as `split_once()`, `rsplit_once()`, `split_once_at()`, `char_at()`, `substr()`, and `grapheme_substr()` report failure with `std::optional`.
 
 > [!WARNING]
 > Like `utf8_string`, borrowed results from `as_view()`, `chars()`, `graphemes()`, `reversed_graphemes()`, and related range helpers are tied to the string's internal storage and should not be kept across mutation.
