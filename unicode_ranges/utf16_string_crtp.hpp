@@ -268,24 +268,56 @@ inline constexpr bool utf16_split_input_ends_with_delimiter(
 		&& base.substr(base.size() - delimiter.size()) == delimiter;
 }
 
-template <typename View>
-class utf16_split_view : public std::ranges::view_interface<utf16_split_view<View>>
+struct borrowed_utf16_split_delimiter
 {
-public:
-	static constexpr utf16_split_view from_code_units_unchecked(
-		std::u16string_view base,
-		std::u16string_view delimiter,
-		bool drop_trailing_empty = false) noexcept
+	std::u16string_view value{};
+
+	constexpr borrowed_utf16_split_delimiter() = default;
+
+	constexpr explicit borrowed_utf16_split_delimiter(std::u16string_view value) noexcept
+		: value(value)
 	{
-		return utf16_split_view{ base, delimiter, drop_trailing_empty };
 	}
 
-	static constexpr utf16_split_view from_utf16_char_unchecked(
-		std::u16string_view base,
-		utf16_char delimiter,
-		bool drop_trailing_empty = false) noexcept
+	constexpr std::u16string_view view() const noexcept
 	{
-		return utf16_split_view{ base, delimiter, drop_trailing_empty };
+		return value;
+	}
+};
+
+struct owned_utf16_split_char_delimiter
+{
+	std::array<char16_t, 2> bytes{};
+	std::uint8_t size = 0;
+
+	constexpr owned_utf16_split_char_delimiter() = default;
+
+	constexpr explicit owned_utf16_split_char_delimiter(utf16_char delimiter) noexcept
+	{
+		const auto delimiter_view = delimiter.as_view();
+		size = static_cast<std::uint8_t>(delimiter_view.size());
+		for (std::size_t i = 0; i != delimiter_view.size(); ++i)
+		{
+			bytes[i] = delimiter_view[i];
+		}
+	}
+
+	constexpr std::u16string_view view() const noexcept
+	{
+		return std::u16string_view{ bytes.data(), size };
+	}
+};
+
+template <typename View, bool DropTrailingEmpty, typename DelimiterStorage>
+class basic_utf16_split_view
+	: public std::ranges::view_interface<basic_utf16_split_view<View, DropTrailingEmpty, DelimiterStorage>>
+{
+public:
+	static constexpr basic_utf16_split_view from_delimiter_storage(
+		std::u16string_view base,
+		DelimiterStorage delimiter_storage) noexcept
+	{
+		return basic_utf16_split_view{ base, delimiter_storage };
 	}
 
 	class iterator
@@ -303,12 +335,10 @@ public:
 		constexpr iterator(
 			std::u16string_view base,
 			std::u16string_view delimiter,
-			bool drop_trailing_empty,
 			std::size_t current,
 			std::size_t next_delimiter) noexcept
 			: base_(base),
 			  delimiter_(delimiter),
-			  drop_trailing_empty_(drop_trailing_empty),
 			  current_(current),
 			  next_delimiter_(next_delimiter)
 		{}
@@ -330,11 +360,14 @@ public:
 			}
 
 			const auto next_current = next_delimiter_ + delimiter_.size();
-			if (drop_trailing_empty_ && next_current == base_.size())
+			if constexpr (DropTrailingEmpty)
 			{
-				current_ = std::u16string_view::npos;
-				next_delimiter_ = std::u16string_view::npos;
-				return *this;
+				if (next_current == base_.size())
+				{
+					current_ = std::u16string_view::npos;
+					next_delimiter_ = std::u16string_view::npos;
+					return *this;
+				}
 			}
 
 			current_ = next_current;
@@ -352,12 +385,19 @@ public:
 		constexpr iterator& operator--() noexcept
 		{
 			const auto old_current = current_;
-			const auto current_for_search = old_current == std::u16string_view::npos
-				&& drop_trailing_empty_
-				&& details::utf16_split_input_ends_with_delimiter(base_, delimiter_)
-				? base_.size()
-				: old_current;
-			current_ = utf16_split_view::find_previous_segment_start(base_, delimiter_, current_for_search);
+			const auto current_for_search = [&]() constexpr noexcept {
+				if constexpr (DropTrailingEmpty)
+				{
+					if (old_current == std::u16string_view::npos
+						&& details::utf16_split_input_ends_with_delimiter(base_, delimiter_))
+					{
+						return base_.size();
+					}
+				}
+
+				return old_current;
+			}();
+			current_ = basic_utf16_split_view::find_previous_segment_start(base_, delimiter_, current_for_search);
 			next_delimiter_ = old_current == std::u16string_view::npos
 				? details::find_utf16_split_delimiter(base_, delimiter_, current_)
 				: old_current - delimiter_.size();
@@ -387,7 +427,6 @@ public:
 				&& lhs.base_.size() == rhs.base_.size()
 				&& lhs.delimiter_.data() == rhs.delimiter_.data()
 				&& lhs.delimiter_.size() == rhs.delimiter_.size()
-				&& lhs.drop_trailing_empty_ == rhs.drop_trailing_empty_
 				&& lhs.current_ == rhs.current_
 				&& lhs.next_delimiter_ == rhs.next_delimiter_;
 		}
@@ -395,7 +434,6 @@ public:
 	private:
 		std::u16string_view base_{};
 		std::u16string_view delimiter_{};
-		bool drop_trailing_empty_ = false;
 		std::size_t current_ = 0;
 		std::size_t next_delimiter_ = std::u16string_view::npos;
 	};
@@ -406,7 +444,6 @@ public:
 		return iterator{
 			base_,
 			delimiter,
-			drop_trailing_empty_,
 			0,
 			details::find_utf16_split_delimiter(base_, delimiter, 0)
 		};
@@ -418,38 +455,21 @@ public:
 		return iterator{
 			base_,
 			delimiter,
-			drop_trailing_empty_,
 			std::u16string_view::npos,
 			std::u16string_view::npos
 		};
 	}
 
 private:
-	constexpr explicit utf16_split_view(
+	constexpr explicit basic_utf16_split_view(
 		std::u16string_view base,
-		std::u16string_view delimiter,
-		bool drop_trailing_empty) noexcept
-		: base_(base), delimiter_(delimiter), drop_trailing_empty_(drop_trailing_empty)
+		DelimiterStorage delimiter_storage) noexcept
+		: base_(base), delimiter_storage_(delimiter_storage)
 	{}
-
-	constexpr explicit utf16_split_view(
-		std::u16string_view base,
-		utf16_char delimiter,
-		bool drop_trailing_empty) noexcept
-		: base_(base), delimiter_owned_size_(delimiter.as_view().size()), owns_delimiter_(true), drop_trailing_empty_(drop_trailing_empty)
-	{
-		const auto delimiter_view = delimiter.as_view();
-		for (std::size_t i = 0; i != delimiter_view.size(); ++i)
-		{
-			delimiter_owned_[i] = delimiter_view[i];
-		}
-	}
 
 	constexpr std::u16string_view delimiter_view() const noexcept
 	{
-		return owns_delimiter_
-			? std::u16string_view{ delimiter_owned_.data(), delimiter_owned_size_ }
-			: delimiter_;
+		return delimiter_storage_.view();
 	}
 
 	static constexpr std::size_t find_previous_segment_start(
@@ -479,31 +499,26 @@ private:
 	}
 
 	std::u16string_view base_{};
-	std::u16string_view delimiter_{};
-	std::array<char16_t, 2> delimiter_owned_{};
-	std::size_t delimiter_owned_size_ = 0;
-	bool owns_delimiter_ = false;
-	bool drop_trailing_empty_ = false;
+	DelimiterStorage delimiter_storage_{};
 };
 
-template <typename View, bool Reverse>
-class utf16_splitn_view : public std::ranges::view_interface<utf16_splitn_view<View, Reverse>>
+template <typename View, bool DropTrailingEmpty>
+using utf16_split_view = basic_utf16_split_view<View, DropTrailingEmpty, borrowed_utf16_split_delimiter>;
+
+template <typename View, bool DropTrailingEmpty>
+using utf16_split_char_view = basic_utf16_split_view<View, DropTrailingEmpty, owned_utf16_split_char_delimiter>;
+
+template <typename View, bool Reverse, typename DelimiterStorage>
+class basic_utf16_splitn_view
+	: public std::ranges::view_interface<basic_utf16_splitn_view<View, Reverse, DelimiterStorage>>
 {
 public:
-	static constexpr utf16_splitn_view from_code_units_unchecked(
+	static constexpr basic_utf16_splitn_view from_delimiter_storage(
 		std::u16string_view base,
-		std::u16string_view delimiter,
+		DelimiterStorage delimiter_storage,
 		std::size_t count) noexcept
 	{
-		return utf16_splitn_view{ base, delimiter, count };
-	}
-
-	static constexpr utf16_splitn_view from_utf16_char_unchecked(
-		std::u16string_view base,
-		utf16_char delimiter,
-		std::size_t count) noexcept
-	{
-		return utf16_splitn_view{ base, delimiter, count };
+		return basic_utf16_splitn_view{ base, delimiter_storage, count };
 	}
 
 	class iterator
@@ -639,40 +654,28 @@ public:
 	}
 
 private:
-	constexpr explicit utf16_splitn_view(
+	constexpr explicit basic_utf16_splitn_view(
 		std::u16string_view base,
-		std::u16string_view delimiter,
+		DelimiterStorage delimiter_storage,
 		std::size_t count) noexcept
-		: base_(base), delimiter_(delimiter), count_(count)
+		: base_(base), delimiter_storage_(delimiter_storage), count_(count)
 	{}
-
-	constexpr explicit utf16_splitn_view(
-		std::u16string_view base,
-		utf16_char delimiter,
-		std::size_t count) noexcept
-		: base_(base), delimiter_owned_size_(delimiter.as_view().size()), owns_delimiter_(true), count_(count)
-	{
-		const auto delimiter_view = delimiter.as_view();
-		for (std::size_t i = 0; i != delimiter_view.size(); ++i)
-		{
-			delimiter_owned_[i] = delimiter_view[i];
-		}
-	}
 
 	constexpr std::u16string_view delimiter_view() const noexcept
 	{
-		return owns_delimiter_
-			? std::u16string_view{ delimiter_owned_.data(), delimiter_owned_size_ }
-			: delimiter_;
+		return delimiter_storage_.view();
 	}
 
 	std::u16string_view base_{};
-	std::u16string_view delimiter_{};
-	std::array<char16_t, 2> delimiter_owned_{};
-	std::size_t delimiter_owned_size_ = 0;
-	bool owns_delimiter_ = false;
+	DelimiterStorage delimiter_storage_{};
 	std::size_t count_ = 0;
 };
+
+template <typename View, bool Reverse>
+using utf16_splitn_view = basic_utf16_splitn_view<View, Reverse, borrowed_utf16_split_delimiter>;
+
+template <typename View, bool Reverse>
+using utf16_splitn_char_view = basic_utf16_splitn_view<View, Reverse, owned_utf16_split_char_delimiter>;
 
 inline constexpr bool utf16_char_is_whitespace_at(
 	std::u16string_view base,
@@ -1370,12 +1373,16 @@ public:
 
 	constexpr auto split(utf16_char ch) const noexcept
 	{
-		return utf16_split_view<View>::from_utf16_char_unchecked(code_unit_view(), ch);
+		return utf16_split_char_view<View, false>::from_delimiter_storage(
+			code_unit_view(),
+			details::owned_utf16_split_char_delimiter{ ch });
 	}
 
 	constexpr auto split(View sv) const noexcept
 	{
-		return utf16_split_view<View>::from_code_units_unchecked(code_unit_view(), sv.base());
+		return utf16_split_view<View, false>::from_delimiter_storage(
+			code_unit_view(),
+			details::borrowed_utf16_split_delimiter{ sv.base() });
 	}
 
 	constexpr auto split_whitespace() const noexcept
@@ -1390,7 +1397,7 @@ public:
 
 	constexpr auto rsplit(utf16_char ch) const noexcept
 	{
-		return rsplit(View::from_code_units_unchecked(ch.as_view()));
+		return std::views::reverse(split(ch));
 	}
 
 	constexpr auto rsplit(View sv) const noexcept
@@ -1400,17 +1407,21 @@ public:
 
 	constexpr auto split_terminator(utf16_char ch) const noexcept
 	{
-		return utf16_split_view<View>::from_utf16_char_unchecked(code_unit_view(), ch, true);
+		return utf16_split_char_view<View, true>::from_delimiter_storage(
+			code_unit_view(),
+			details::owned_utf16_split_char_delimiter{ ch });
 	}
 
 	constexpr auto split_terminator(View sv) const noexcept
 	{
-		return utf16_split_view<View>::from_code_units_unchecked(code_unit_view(), sv.base(), true);
+		return utf16_split_view<View, true>::from_delimiter_storage(
+			code_unit_view(),
+			details::borrowed_utf16_split_delimiter{ sv.base() });
 	}
 
 	constexpr auto rsplit_terminator(utf16_char ch) const noexcept
 	{
-		return rsplit_terminator(View::from_code_units_unchecked(ch.as_view()));
+		return std::views::reverse(split_terminator(ch));
 	}
 
 	constexpr auto rsplit_terminator(View sv) const noexcept
@@ -1420,22 +1431,34 @@ public:
 
 	constexpr auto splitn(size_type count, utf16_char ch) const noexcept
 	{
-		return utf16_splitn_view<View, false>::from_utf16_char_unchecked(code_unit_view(), ch, count);
+		return utf16_splitn_char_view<View, false>::from_delimiter_storage(
+			code_unit_view(),
+			details::owned_utf16_split_char_delimiter{ ch },
+			count);
 	}
 
 	constexpr auto splitn(size_type count, View sv) const noexcept
 	{
-		return utf16_splitn_view<View, false>::from_code_units_unchecked(code_unit_view(), sv.base(), count);
+		return utf16_splitn_view<View, false>::from_delimiter_storage(
+			code_unit_view(),
+			details::borrowed_utf16_split_delimiter{ sv.base() },
+			count);
 	}
 
 	constexpr auto rsplitn(size_type count, utf16_char ch) const noexcept
 	{
-		return utf16_splitn_view<View, true>::from_utf16_char_unchecked(code_unit_view(), ch, count);
+		return utf16_splitn_char_view<View, true>::from_delimiter_storage(
+			code_unit_view(),
+			details::owned_utf16_split_char_delimiter{ ch },
+			count);
 	}
 
 	constexpr auto rsplitn(size_type count, View sv) const noexcept
 	{
-		return utf16_splitn_view<View, true>::from_code_units_unchecked(code_unit_view(), sv.base(), count);
+		return utf16_splitn_view<View, true>::from_delimiter_storage(
+			code_unit_view(),
+			details::borrowed_utf16_split_delimiter{ sv.base() },
+			count);
 	}
 
 	constexpr std::optional<std::pair<View, View>> split_once(utf16_char ch) const noexcept
