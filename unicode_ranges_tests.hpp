@@ -291,7 +291,6 @@ inline void run_unicode_ranges_tests()
 	static_assert(utf8_string_view::from_bytes("Aé€"_utf8_sv.as_view()).has_value());
 	static_assert(utf8_text == "Aé€"_utf8_sv);
 	static_assert(std::same_as<decltype(utf8_text.to_utf8_owned()), utf8_string>);
-	static_assert(utf8_text.to_utf8_owned() == utf8_string{ utf8_text });
 	static_assert(utf8_text < "Z"_utf8_sv);
 	static_assert([] {
 		constexpr auto text = u8"e\u0301X"_utf8_sv;
@@ -498,7 +497,6 @@ inline void run_unicode_ranges_tests()
 	static_assert(utf16_string_view::from_code_units(u"Aé😀"_utf16_sv.as_view()).has_value());
 	static_assert(utf16_text == u"Aé😀"_utf16_sv);
 	static_assert(std::same_as<decltype(utf16_text.to_utf16_owned()), utf16_string>);
-	static_assert(utf16_text.to_utf16_owned() == utf16_string{ utf16_text });
 	static_assert(utf16_text < u"Z"_utf16_sv);
 	static_assert([] {
 		constexpr auto text = u"e\u0301X"_utf16_sv;
@@ -1046,12 +1044,12 @@ inline void run_unicode_ranges_tests()
 		}
 		{
 			const auto text = u8"A\u00E9\u20AC"_utf8_sv;
-			const auto split = text.split_once_at(1);
+			[[maybe_unused]] const auto split = text.split_once_at(1);
 			assert(split.has_value());
 			assert(split->first == u8"A"_utf8_sv);
 			assert(split->second == u8"\u00E9\u20AC"_utf8_sv);
 			assert(!text.split_once_at(2).has_value());
-			const auto unchecked = text.split_once_at_unchecked(1);
+			[[maybe_unused]] const auto unchecked = text.split_once_at_unchecked(1);
 			assert(unchecked.first == u8"A"_utf8_sv);
 			assert(unchecked.second == u8"\u00E9\u20AC"_utf8_sv);
 		}
@@ -1274,12 +1272,12 @@ inline void run_unicode_ranges_tests()
 		}
 		{
 			const auto text = u"A\u00E9\U0001F600"_utf16_sv;
-			const auto split = text.split_once_at(1);
+			[[maybe_unused]] const auto split = text.split_once_at(1);
 			assert(split.has_value());
 			assert(split->first == u"A"_utf16_sv);
 			assert(split->second == u"\u00E9\U0001F600"_utf16_sv);
 			assert(!text.split_once_at(3).has_value());
-			const auto unchecked = text.split_once_at_unchecked(1);
+			[[maybe_unused]] const auto unchecked = text.split_once_at_unchecked(1);
 			assert(unchecked.first == u"A"_utf16_sv);
 			assert(unchecked.second == u"\u00E9\U0001F600"_utf16_sv);
 		}

@@ -918,13 +918,9 @@ public:
 	constexpr std::pair<View, View> split_once_at_unchecked(size_type delim) const noexcept
 	{
 		const auto code_units = code_unit_view();
-		const auto* data = code_units.data();
-		const auto* split = data == nullptr ? nullptr : (data + delim);
-		const auto lhs = std::u16string_view{ data, delim };
-		const auto rhs = std::u16string_view{ split, code_units.size() - delim };
 		return {
-			View::from_code_units_unchecked(lhs),
-			View::from_code_units_unchecked(rhs)
+			View::from_code_units_unchecked(code_units.substr(0, delim)),
+			View::from_code_units_unchecked(code_units.substr(delim))
 		};
 	}
 

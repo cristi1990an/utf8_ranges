@@ -2155,6 +2155,111 @@ Complexity:
 - `operator+`: linear in `lhs.size() + rhs.size()`
 - `to_utf8()`: linear in `size()`
 
+#### Insert
+
+```cpp
+constexpr basic_utf16_string& insert(std::size_t index, utf16_string_view sv);
+constexpr basic_utf16_string& insert(std::size_t index, utf16_char ch);
+constexpr basic_utf16_string& insert(std::size_t index, std::size_t count, utf16_char ch);
+constexpr basic_utf16_string& insert_range(std::size_t index, R&& rg);
+constexpr basic_utf16_string& insert(std::size_t index, It it, Sent sent);
+constexpr basic_utf16_string& insert(std::size_t index, std::initializer_list<utf16_char> ilist);
+```
+
+Inserts validated UTF-16 text or UTF-16 characters at code-unit index `index`.
+
+Supported inputs:
+
+- `utf16_string_view`
+- one `utf16_char`
+- repeated `utf16_char`
+- ranges of `utf16_char`
+- iterator/sentinel pairs
+- initializer lists of `utf16_char`
+
+Requirements:
+
+- `index <= size()`
+- `index` must name a UTF-16 character boundary
+
+Throws:
+
+- `std::out_of_range` if `index` is greater than `size()`
+- `std::out_of_range` if `index` does not name a UTF-16 character boundary
+
+Complexity: linear in `size() + inserted_size`.
+
+#### Pop Back
+
+```cpp
+constexpr std::optional<utf16_char> pop_back();
+```
+
+Removes and returns the last UTF-16 character.
+
+Returns `std::nullopt` if the string is empty.
+
+Complexity: constant.
+
+#### Erase
+
+```cpp
+constexpr basic_utf16_string& erase(std::size_t index, std::size_t count = npos);
+```
+
+Erases the code-unit range beginning at `index` and extending for at most `count` code units, clamped to the end of the string.
+
+Requirements:
+
+- `index <= size()`
+- `index` must be a UTF-16 character boundary
+- `index + min(count, size() - index)` must also be a UTF-16 character boundary
+
+Throws:
+
+- `std::out_of_range` if `index` is greater than `size()`
+- `std::out_of_range` if the erased range does not align to UTF-16 character boundaries
+
+Complexity: linear in `size()`.
+
+#### Replace
+
+```cpp
+constexpr basic_utf16_string& replace(std::size_t pos, std::size_t count, utf16_string_view other);
+constexpr basic_utf16_string& replace(std::size_t pos, std::size_t count, utf16_char other);
+constexpr basic_utf16_string& replace(std::size_t pos, utf16_string_view other);
+constexpr basic_utf16_string& replace(std::size_t pos, utf16_char other);
+constexpr basic_utf16_string& replace_with_range(std::size_t pos, std::size_t count, R&& rg);
+constexpr basic_utf16_string& replace_with_range(std::size_t pos, R&& rg);
+```
+
+Replaces a UTF-16 substring with validated UTF-16 text, a single UTF-16 character, or a range of UTF-16 characters.
+
+Supported replacements:
+
+- validated UTF-16 text via `replace(..., utf16_string_view)`
+- one character via `replace(..., utf16_char)`
+- character ranges via `replace_with_range(...)`
+
+Requirements:
+
+- `pos <= size()`
+- `pos` must be a UTF-16 character boundary
+- `pos + min(count, size() - pos)` must also be a UTF-16 character boundary when a counted overload is used
+
+The single-position overloads replace exactly one UTF-16 character beginning at `pos`.
+
+Throws:
+
+- `std::out_of_range` if `pos` is out of range
+- `std::out_of_range` if the replaced range does not align to UTF-16 character boundaries
+
+Complexity:
+
+- `replace(..., utf16_string_view)`: linear in `size() + other.size()`
+- `replace(..., utf16_char)`: linear in `size()`
+- `replace_with_range(...)`: linear in `size() + replacement_size`
+
 Example:
 
 ```cpp
@@ -2370,45 +2475,61 @@ Complexity:
 - `assign(utf8_char)` and `operator+=` on single-character arguments: amortized constant
 - `push_back(utf8_char)`: amortized constant
 
-#### `insert`
+#### Insert
 
-Insertion is supported for:
+```cpp
+constexpr basic_utf8_string& insert(std::size_t index, utf8_string_view sv);
+constexpr basic_utf8_string& insert(std::size_t index, utf8_char ch);
+constexpr basic_utf8_string& insert(std::size_t index, std::size_t count, utf8_char ch);
+constexpr basic_utf8_string& insert_range(std::size_t index, R&& rg);
+constexpr basic_utf8_string& insert(std::size_t index, It it, Sent sent);
+constexpr basic_utf8_string& insert(std::size_t index, std::initializer_list<utf8_char> ilist);
+```
+
+Inserts validated UTF-8 text or UTF-8 characters at byte index `index`.
+
+Supported inputs:
 
 - `utf8_string_view`
-- `utf8_char`
+- one `utf8_char`
 - repeated `utf8_char`
 - ranges of `utf8_char`
 - iterator/sentinel pairs
 - initializer lists of `utf8_char`
 
-The insertion index is a byte index and must name a UTF-8 character boundary.
+Requirements:
+
+- `index <= size()`
+- `index` must name a UTF-8 character boundary
 
 Throws:
 
-- `std::out_of_range` if the insertion index is greater than `size()`
-- `std::out_of_range` if the insertion index is not a UTF-8 character boundary
+- `std::out_of_range` if `index` is greater than `size()`
+- `std::out_of_range` if `index` does not name a UTF-8 character boundary
 
-Complexity:
+Complexity: linear in `size() + inserted_size`.
 
-- Linear in `size() + inserted_size`
+#### Pop Back
 
-#### `pop_back()`
+```cpp
+constexpr std::optional<utf8_char> pop_back();
+```
 
-Removes the last UTF-8 character by inspecting the reversed character view.
+Removes and returns the last UTF-8 character.
 
-Returns the removed character.
+Returns `std::nullopt` if the string is empty.
 
-Returns `std::nullopt` when the string is empty.
+Complexity: constant.
 
-Complexity:
+#### Erase
 
-- Constant
-
-#### `erase(std::size_t index, std::size_t count = npos)`
+```cpp
+constexpr basic_utf8_string& erase(std::size_t index, std::size_t count = npos);
+```
 
 Erases the byte range beginning at `index` and extending for at most `count` bytes, clamped to the end of the string.
 
-The erased range must define a valid UTF-8 substring. In practice this means:
+Requirements:
 
 - `index <= size()`
 - `index` must be a UTF-8 character boundary
@@ -2417,21 +2538,30 @@ The erased range must define a valid UTF-8 substring. In practice this means:
 Throws:
 
 - `std::out_of_range` if `index` is greater than `size()`
-- `std::out_of_range` if the requested erased range does not align to UTF-8 character boundaries
+- `std::out_of_range` if the erased range does not align to UTF-8 character boundaries
 
-Complexity:
+Complexity: linear in `size()`.
 
-- Linear in `size()`
+#### Replace
 
-#### `replace`, `replace_with_range`
+```cpp
+constexpr basic_utf8_string& replace(std::size_t pos, std::size_t count, utf8_string_view other);
+constexpr basic_utf8_string& replace(std::size_t pos, std::size_t count, utf8_char other);
+constexpr basic_utf8_string& replace(std::size_t pos, utf8_string_view other);
+constexpr basic_utf8_string& replace(std::size_t pos, utf8_char other);
+constexpr basic_utf8_string& replace_with_range(std::size_t pos, std::size_t count, R&& rg);
+constexpr basic_utf8_string& replace_with_range(std::size_t pos, R&& rg);
+```
 
-Replacement is supported for:
+Replaces a UTF-8 substring with validated UTF-8 text, a single UTF-8 character, or a range of UTF-8 characters.
 
-- validated UTF-8 text via `replace(pos, count, utf8_string_view)` and `replace(pos, utf8_string_view)`
-- single characters via `replace(pos, count, utf8_char)` and `replace(pos, utf8_char)`
-- character ranges via `replace_with_range(pos, count, R&&)` and `replace_with_range(pos, R&&)`
+Supported replacements:
 
-The replaced portion must always describe a valid UTF-8 substring. In practice this means:
+- validated UTF-8 text via `replace(..., utf8_string_view)`
+- one character via `replace(..., utf8_char)`
+- character ranges via `replace_with_range(...)`
+
+Requirements:
 
 - `pos <= size()`
 - `pos` must be a UTF-8 character boundary

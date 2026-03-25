@@ -918,13 +918,9 @@ public:
 	constexpr std::pair<View, View> split_once_at_unchecked(size_type delim) const noexcept
 	{
 		const auto bytes = byte_view();
-		const auto* data = bytes.data();
-		const auto* split = data == nullptr ? nullptr : (data + delim);
-		const auto lhs = std::u8string_view{ data, delim };
-		const auto rhs = std::u8string_view{ split, bytes.size() - delim };
 		return {
-			View::from_bytes_unchecked(lhs),
-			View::from_bytes_unchecked(rhs)
+			View::from_bytes_unchecked(bytes.substr(0, delim)),
+			View::from_bytes_unchecked(bytes.substr(delim))
 		};
 	}
 
