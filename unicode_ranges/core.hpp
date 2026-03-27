@@ -1999,6 +1999,141 @@ namespace details
 		}
 
 		template <typename CharT>
+		inline constexpr std::size_t count_ascii_grapheme_run(
+			std::basic_string_view<CharT> ascii_run,
+			bool first_continues_previous) noexcept
+		{
+			if (ascii_run.empty())
+			{
+				return 0;
+			}
+
+			std::size_t count = first_continues_previous ? 0u : 1u;
+			for (std::size_t index = 1; index != ascii_run.size(); ++index)
+			{
+				const auto previous = static_cast<std::uint32_t>(ascii_run[index - 1]);
+				const auto current = static_cast<std::uint32_t>(ascii_run[index]);
+				if (previous != static_cast<std::uint32_t>('\r')
+					|| current != static_cast<std::uint32_t>('\n'))
+				{
+					++count;
+				}
+			}
+
+			return count;
+		}
+
+		inline constexpr std::size_t grapheme_count(std::u8string_view text) noexcept
+		{
+			if (text.empty())
+			{
+				return 0;
+			}
+
+			const auto* const begin = text.data();
+			const auto* const end = begin + text.size();
+			auto position = begin;
+			std::size_t count = 0;
+			bool has_state = false;
+			grapheme_state state{};
+
+			while (position < end)
+			{
+				const auto remaining = std::u8string_view{ position, static_cast<std::size_t>(end - position) };
+				const auto ascii_run = ascii_prefix_length(remaining);
+				if (ascii_run != 0) [[likely]]
+				{
+					const auto ascii_view = remaining.substr(0, ascii_run);
+					const auto first_scalar = static_cast<std::uint8_t>(ascii_view.front());
+					count += count_ascii_grapheme_run(
+						ascii_view,
+						has_state && should_continue_grapheme_cluster(state, first_scalar));
+					state = make_initial_grapheme_state(static_cast<std::uint8_t>(ascii_view.back()));
+					has_state = true;
+					position += ascii_run;
+					continue;
+				}
+
+				auto next_position = position;
+				const auto scalar = decode_next_utf8_scalar(next_position);
+				if (!has_state)
+				{
+					++count;
+					state = make_initial_grapheme_state(scalar);
+					has_state = true;
+				}
+				else if (!should_continue_grapheme_cluster(state, scalar))
+				{
+					++count;
+					state = make_initial_grapheme_state(scalar);
+				}
+				else
+				{
+					consume_grapheme_scalar(state, scalar);
+				}
+
+				position = next_position;
+			}
+
+			return count;
+		}
+
+		inline constexpr std::size_t grapheme_count(std::u16string_view text) noexcept
+		{
+			if (text.empty())
+			{
+				return 0;
+			}
+
+			const auto* const begin = text.data();
+			const auto* const end = begin + text.size();
+			auto position = begin;
+			std::size_t count = 0;
+			bool has_state = false;
+			grapheme_state state{};
+
+			while (position < end)
+			{
+				const auto remaining = std::u16string_view{ position, static_cast<std::size_t>(end - position) };
+				const auto ascii_run = ascii_prefix_length(remaining);
+				if (ascii_run != 0) [[likely]]
+				{
+					const auto ascii_view = remaining.substr(0, ascii_run);
+					const auto first_scalar = static_cast<std::uint16_t>(ascii_view.front());
+					count += count_ascii_grapheme_run(
+						ascii_view,
+						has_state && should_continue_grapheme_cluster(state, first_scalar));
+					state = make_initial_grapheme_state(static_cast<std::uint16_t>(ascii_view.back()));
+					has_state = true;
+					position += ascii_run;
+					continue;
+				}
+
+				auto next_position = position;
+				const auto scalar = decode_next_utf16_scalar(next_position);
+				if (!has_state)
+				{
+					++count;
+					state = make_initial_grapheme_state(scalar);
+					has_state = true;
+				}
+				else if (!should_continue_grapheme_cluster(state, scalar))
+				{
+					++count;
+					state = make_initial_grapheme_state(scalar);
+				}
+				else
+				{
+					consume_grapheme_scalar(state, scalar);
+				}
+
+				position = next_position;
+			}
+
+			return count;
+		}
+
+		template <typename CharT>
 		inline constexpr std::size_t previous_grapheme_boundary(std::basic_string_view<CharT> text, std::size_t index) noexcept
 		{
 			index = (std::min)(text.size(), index);
@@ -2025,13 +2160,25 @@ namespace details
 		template <typename CharT>
 		inline constexpr std::size_t grapheme_count(std::basic_string_view<CharT> text) noexcept
 		{
-			std::size_t count = 0;
-			for (std::size_t index = 0; index < text.size(); index = next_grapheme_boundary(text, index))
+			if constexpr (std::same_as<CharT, char8_t>)
 			{
-				++count;
+				return grapheme_count(std::u8string_view{ text.data(), text.size() });
 			}
 
-			return count;
+			else if constexpr (std::same_as<CharT, char16_t>)
+			{
+				return grapheme_count(std::u16string_view{ text.data(), text.size() });
+			}
+			else
+			{
+				std::size_t count = 0;
+				for (std::size_t index = 0; index < text.size(); index = next_grapheme_boundary(text, index))
+				{
+					++count;
+				}
+
+				return count;
+			}
 		}
 
 		template <typename CharT>

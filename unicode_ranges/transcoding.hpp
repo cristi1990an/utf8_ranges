@@ -273,11 +273,23 @@ namespace unicode_ranges
 		}
 	}
 
+	template <bool Lowercase>
+	inline constexpr const unicode::unicode_case_mapping* lookup_case_mapping(std::uint32_t scalar) noexcept
+	{
+		if constexpr (Lowercase)
+		{
+			return unicode::lowercase_mapping(scalar);
+		}
+		else
+		{
+			return unicode::uppercase_mapping(scalar);
+		}
+	}
+
 	template <bool Lowercase, typename BaseType>
 	constexpr bool try_case_map_utf8_same_size(
 		std::u8string_view bytes,
-		BaseType& result,
-		const unicode::unicode_case_mapping* (*lookup)(std::uint32_t) noexcept)
+		BaseType& result)
 	{
 		bool same_size = true;
 		result.resize_and_overwrite(bytes.size(),
@@ -306,7 +318,7 @@ namespace unicode_ranges
 
 					const auto decoded = decode_next_scalar(bytes, index);
 					const auto input_size = decoded.next_index - index;
-					if (const auto* mapping = lookup(decoded.scalar); mapping != nullptr)
+					if (const auto* mapping = lookup_case_mapping<Lowercase>(decoded.scalar); mapping != nullptr)
 					{
 						if (mapping->count != 1u)
 						{
@@ -341,8 +353,7 @@ namespace unicode_ranges
 	template <bool Lowercase, typename BaseType>
 	constexpr bool try_case_map_utf16_same_size(
 		std::u16string_view code_units,
-		BaseType& result,
-		const unicode::unicode_case_mapping* (*lookup)(std::uint32_t) noexcept)
+		BaseType& result)
 	{
 		bool same_size = true;
 		result.resize_and_overwrite(code_units.size(),
@@ -371,7 +382,7 @@ namespace unicode_ranges
 
 					const auto decoded = decode_next_scalar(code_units, index);
 					const auto input_size = decoded.next_index - index;
-					if (const auto* mapping = lookup(decoded.scalar); mapping != nullptr)
+					if (const auto* mapping = lookup_case_mapping<Lowercase>(decoded.scalar); mapping != nullptr)
 					{
 						if (mapping->count != 1u)
 						{
@@ -406,8 +417,7 @@ namespace unicode_ranges
 	template <bool Lowercase, typename Allocator>
 	constexpr basic_utf8_string<Allocator> case_map_utf8_copy(
 		std::u8string_view bytes,
-		const Allocator& alloc,
-		const unicode::unicode_case_mapping* (*lookup)(std::uint32_t) noexcept)
+		const Allocator& alloc)
 	{
 		using base_type = typename basic_utf8_string<Allocator>::base_type;
 
@@ -439,7 +449,7 @@ namespace unicode_ranges
 		}
 
 		base_type same_size_result{ alloc };
-		if (try_case_map_utf8_same_size<Lowercase>(bytes, same_size_result, lookup))
+		if (try_case_map_utf8_same_size<Lowercase>(bytes, same_size_result))
 		{
 			return basic_utf8_string<Allocator>::from_bytes_unchecked(std::move(same_size_result));
 		}
@@ -467,7 +477,7 @@ namespace unicode_ranges
 			}
 
 			const auto decoded = decode_next_scalar(bytes, index);
-			if (const auto* mapping = lookup(decoded.scalar); mapping != nullptr)
+			if (const auto* mapping = lookup_case_mapping<Lowercase>(decoded.scalar); mapping != nullptr)
 			{
 				changed = true;
 				for (std::size_t mapped_index = 0; mapped_index != mapping->count; ++mapped_index)
@@ -514,7 +524,7 @@ namespace unicode_ranges
 					}
 
 					const auto decoded = decode_next_scalar(bytes, index);
-					if (const auto* mapping = lookup(decoded.scalar); mapping != nullptr)
+					if (const auto* mapping = lookup_case_mapping<Lowercase>(decoded.scalar); mapping != nullptr)
 					{
 						for (std::size_t mapped_index = 0; mapped_index != mapping->count; ++mapped_index)
 						{
@@ -544,8 +554,7 @@ namespace unicode_ranges
 	template <bool Lowercase, typename Allocator>
 	constexpr basic_utf16_string<Allocator> case_map_utf16_copy(
 		std::u16string_view code_units,
-		const Allocator& alloc,
-		const unicode::unicode_case_mapping* (*lookup)(std::uint32_t) noexcept)
+		const Allocator& alloc)
 	{
 		using base_type = typename basic_utf16_string<Allocator>::base_type;
 
@@ -577,7 +586,7 @@ namespace unicode_ranges
 		}
 
 		base_type same_size_result{ alloc };
-		if (try_case_map_utf16_same_size<Lowercase>(code_units, same_size_result, lookup))
+		if (try_case_map_utf16_same_size<Lowercase>(code_units, same_size_result))
 		{
 			return basic_utf16_string<Allocator>::from_code_units_unchecked(std::move(same_size_result));
 		}
@@ -605,7 +614,7 @@ namespace unicode_ranges
 			}
 
 			const auto decoded = decode_next_scalar(code_units, index);
-			if (const auto* mapping = lookup(decoded.scalar); mapping != nullptr)
+			if (const auto* mapping = lookup_case_mapping<Lowercase>(decoded.scalar); mapping != nullptr)
 			{
 				changed = true;
 				for (std::size_t mapped_index = 0; mapped_index != mapping->count; ++mapped_index)
@@ -652,7 +661,7 @@ namespace unicode_ranges
 					}
 
 					const auto decoded = decode_next_scalar(code_units, index);
-					if (const auto* mapping = lookup(decoded.scalar); mapping != nullptr)
+					if (const auto* mapping = lookup_case_mapping<Lowercase>(decoded.scalar); mapping != nullptr)
 					{
 						for (std::size_t mapped_index = 0; mapped_index != mapping->count; ++mapped_index)
 						{
@@ -724,14 +733,14 @@ namespace unicode_ranges
 	template <typename Allocator>
 	constexpr basic_utf8_string<Allocator> utf8_string_crtp<Derived, View>::to_lowercase(const Allocator& alloc) const
 	{
-		return case_map_utf8_copy<true>(byte_view(), alloc, &unicode::lowercase_mapping);
+		return case_map_utf8_copy<true>(byte_view(), alloc);
 	}
 
 	template <typename Derived, typename View>
 	template <typename Allocator>
 	constexpr basic_utf8_string<Allocator> utf8_string_crtp<Derived, View>::to_uppercase(const Allocator& alloc) const
 	{
-		return case_map_utf8_copy<false>(byte_view(), alloc, &unicode::uppercase_mapping);
+		return case_map_utf8_copy<false>(byte_view(), alloc);
 	}
 
 	template <typename Derived, typename View>
@@ -1161,14 +1170,14 @@ namespace unicode_ranges
 	template <typename Allocator>
 	constexpr basic_utf16_string<Allocator> utf16_string_crtp<Derived, View>::to_lowercase(const Allocator& alloc) const
 	{
-		return case_map_utf16_copy<true>(code_unit_view(), alloc, &unicode::lowercase_mapping);
+		return case_map_utf16_copy<true>(code_unit_view(), alloc);
 	}
 
 	template <typename Derived, typename View>
 	template <typename Allocator>
 	constexpr basic_utf16_string<Allocator> utf16_string_crtp<Derived, View>::to_uppercase(const Allocator& alloc) const
 	{
-		return case_map_utf16_copy<false>(code_unit_view(), alloc, &unicode::uppercase_mapping);
+		return case_map_utf16_copy<false>(code_unit_view(), alloc);
 	}
 
 	template <typename Derived, typename View>

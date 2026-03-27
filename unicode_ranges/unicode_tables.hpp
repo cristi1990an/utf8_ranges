@@ -22,6 +22,28 @@ struct unicode_case_mapping
     std::array<std::uint32_t, unicode_case_mapping_max_length> mapped;
 };
 
+inline constexpr std::size_t unicode_case_mapping_page_shift = 8;
+inline constexpr std::size_t unicode_case_mapping_page_count = (0x10FFFFu >> unicode_case_mapping_page_shift) + 1u;
+
+template <std::size_t N>
+constexpr auto make_case_mapping_page_index(const std::array<unicode_case_mapping, N>& mappings) noexcept
+{
+    std::array<std::uint16_t, unicode_case_mapping_page_count + 1> page_index{};
+    std::size_t mapping_index = 0;
+    for (std::size_t page = 0; page != unicode_case_mapping_page_count; ++page)
+    {
+        page_index[page] = static_cast<std::uint16_t>(mapping_index);
+        const auto page_end = static_cast<std::uint32_t>((page + 1u) << unicode_case_mapping_page_shift);
+        while (mapping_index < N && mappings[mapping_index].source < page_end)
+        {
+            ++mapping_index;
+        }
+    }
+
+    page_index[unicode_case_mapping_page_count] = static_cast<std::uint16_t>(mapping_index);
+    return page_index;
+}
+
 template <std::size_t N>
 constexpr const unicode_case_mapping* find_case_mapping(std::uint32_t scalar, const std::array<unicode_case_mapping, N>& mappings) noexcept
 {
@@ -44,6 +66,36 @@ constexpr const unicode_case_mapping* find_case_mapping(std::uint32_t scalar, co
             return &mapping;
         }
     }
+    return nullptr;
+}
+
+template <std::size_t N, std::size_t P>
+constexpr const unicode_case_mapping* find_case_mapping_paged(
+    std::uint32_t scalar,
+    const std::array<unicode_case_mapping, N>& mappings,
+    const std::array<std::uint16_t, P>& page_index) noexcept
+{
+    const auto page = static_cast<std::size_t>(scalar >> unicode_case_mapping_page_shift);
+    std::size_t left = page_index[page];
+    std::size_t right = page_index[page + 1u];
+    while (left < right)
+    {
+        const std::size_t mid = left + (right - left) / 2;
+        const unicode_case_mapping& mapping = mappings[mid];
+        if (scalar < mapping.source)
+        {
+            right = mid;
+        }
+        else if (scalar > mapping.source)
+        {
+            left = mid + 1;
+        }
+        else
+        {
+            return &mapping;
+        }
+    }
+
     return nullptr;
 }
 
@@ -7921,14 +7973,17 @@ constexpr bool is_digit(std::uint32_t scalar) noexcept
     return in_ranges(scalar, digit_ranges);
 }
 
+inline constexpr auto lowercase_mapping_page_index = make_case_mapping_page_index(lowercase_mappings);
+inline constexpr auto uppercase_mapping_page_index = make_case_mapping_page_index(uppercase_mappings);
+
 constexpr const unicode_case_mapping* lowercase_mapping(std::uint32_t scalar) noexcept
 {
-    return find_case_mapping(scalar, lowercase_mappings);
+    return find_case_mapping_paged(scalar, lowercase_mappings, lowercase_mapping_page_index);
 }
 
 constexpr const unicode_case_mapping* uppercase_mapping(std::uint32_t scalar) noexcept
 {
-    return find_case_mapping(scalar, uppercase_mappings);
+    return find_case_mapping_paged(scalar, uppercase_mappings, uppercase_mapping_page_index);
 }
 
 constexpr grapheme_cluster_break_property grapheme_cluster_break(std::uint32_t scalar) noexcept

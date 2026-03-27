@@ -469,9 +469,12 @@ struct utf16_char_span_matcher
 
 	std::span<const utf16_char> chars{};
 	std::array<std::uint64_t, 2> ascii_bits{};
-	std::array<std::uint32_t, non_ascii_inline_capacity> non_ascii_scalars{};
-	std::uint8_t non_ascii_count = 0;
-	bool non_ascii_overflow = false;
+	std::array<std::uint16_t, non_ascii_inline_capacity> bmp_non_ascii_code_units{};
+	std::array<std::uint32_t, non_ascii_inline_capacity> supplementary_scalars{};
+	std::uint8_t bmp_non_ascii_count = 0;
+	std::uint8_t supplementary_count = 0;
+	bool bmp_non_ascii_overflow = false;
+	bool supplementary_overflow = false;
 
 	constexpr utf16_char_span_matcher() noexcept = default;
 
@@ -488,7 +491,14 @@ struct utf16_char_span_matcher
 			}
 			else
 			{
-				insert_non_ascii_scalar(scalar);
+				if (scalar <= 0xFFFFu)
+				{
+					insert_bmp_non_ascii_code_unit(static_cast<std::uint16_t>(scalar));
+				}
+				else
+				{
+					insert_supplementary_scalar(scalar);
+				}
 			}
 		}
 	}
@@ -502,13 +512,22 @@ struct utf16_char_span_matcher
 	[[nodiscard]]
 	constexpr bool has_non_ascii() const noexcept
 	{
-		return non_ascii_count != 0 || non_ascii_overflow;
+		return bmp_non_ascii_count != 0
+			|| supplementary_count != 0
+			|| bmp_non_ascii_overflow
+			|| supplementary_overflow;
 	}
 
 	[[nodiscard]]
 	constexpr bool has_non_ascii_overflow() const noexcept
 	{
-		return non_ascii_overflow;
+		return bmp_non_ascii_overflow || supplementary_overflow;
+	}
+
+	[[nodiscard]]
+	constexpr bool has_supplementary() const noexcept
+	{
+		return supplementary_count != 0 || supplementary_overflow;
 	}
 
 	[[nodiscard]]
@@ -518,21 +537,57 @@ struct utf16_char_span_matcher
 	}
 
 	[[nodiscard]]
-	constexpr bool matches_non_ascii_scalar(std::uint32_t scalar) const noexcept
+	constexpr bool matches_bmp_non_ascii(std::uint16_t code_unit) const noexcept
 	{
-		if (non_ascii_count == 0 && !non_ascii_overflow)
+		if (bmp_non_ascii_count == 0 && !bmp_non_ascii_overflow)
 		{
 			return false;
 		}
 
-		if (!non_ascii_overflow)
+		if (!bmp_non_ascii_overflow)
 		{
-			return contains_non_ascii_scalar(scalar);
+			return contains_bmp_non_ascii_code_unit(code_unit);
 		}
 
 		for (utf16_char candidate : chars)
 		{
-			if (!candidate.is_ascii() && candidate.as_scalar() == scalar)
+			if (!candidate.is_ascii()
+				&& candidate.code_unit_count() == 1u
+				&& static_cast<std::uint16_t>(candidate.as_scalar()) == code_unit)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	[[nodiscard]]
+	constexpr bool matches_non_ascii_scalar(std::uint32_t scalar) const noexcept
+	{
+		if (scalar <= encoding_constants::ascii_scalar_max)
+		{
+			return false;
+		}
+
+		if (scalar <= 0xFFFFu)
+		{
+			return matches_bmp_non_ascii(static_cast<std::uint16_t>(scalar));
+		}
+
+		if (supplementary_count == 0 && !supplementary_overflow)
+		{
+			return false;
+		}
+
+		if (!supplementary_overflow)
+		{
+			return contains_supplementary_scalar(scalar);
+		}
+
+		for (utf16_char candidate : chars)
+		{
+			if (candidate.code_unit_count() == 2u && candidate.as_scalar() == scalar)
 			{
 				return true;
 			}
@@ -554,19 +609,24 @@ struct utf16_char_span_matcher
 	}
 
 private:
-	constexpr void insert_non_ascii_scalar(std::uint32_t scalar) noexcept
+	template <typename T, std::size_t Capacity>
+	static constexpr void insert_sorted_unique(
+		T value,
+		std::array<T, Capacity>& storage,
+		std::uint8_t& count,
+		bool& overflow) noexcept
 	{
-		if (non_ascii_overflow)
+		if (overflow)
 		{
 			return;
 		}
 
 		std::size_t first = 0;
-		std::size_t last = non_ascii_count;
+		std::size_t last = count;
 		while (first < last)
 		{
 			const auto middle = first + (last - first) / 2;
-			if (non_ascii_scalars[middle] < scalar)
+			if (storage[middle] < value)
 			{
 				first = middle + 1;
 			}
@@ -576,34 +636,37 @@ private:
 			}
 		}
 
-		if (first != non_ascii_count && non_ascii_scalars[first] == scalar)
+		if (first != count && storage[first] == value)
 		{
 			return;
 		}
 
-		if (non_ascii_count == non_ascii_inline_capacity)
+		if (count == Capacity)
 		{
-			non_ascii_overflow = true;
+			overflow = true;
 			return;
 		}
 
-		for (std::size_t i = non_ascii_count; i != first; --i)
+		for (std::size_t i = count; i != first; --i)
 		{
-			non_ascii_scalars[i] = non_ascii_scalars[i - 1];
+			storage[i] = storage[i - 1];
 		}
-		non_ascii_scalars[first] = scalar;
-		++non_ascii_count;
+		storage[first] = value;
+		++count;
 	}
 
 	[[nodiscard]]
-	constexpr bool contains_non_ascii_scalar(std::uint32_t scalar) const noexcept
+	static constexpr bool contains_sorted(
+		auto value,
+		const auto& storage,
+		std::uint8_t count) noexcept
 	{
 		std::size_t first = 0;
-		std::size_t last = non_ascii_count;
+		std::size_t last = count;
 		while (first < last)
 		{
 			const auto middle = first + (last - first) / 2;
-			if (non_ascii_scalars[middle] < scalar)
+			if (storage[middle] < value)
 			{
 				first = middle + 1;
 			}
@@ -613,7 +676,37 @@ private:
 			}
 		}
 
-		return first != non_ascii_count && non_ascii_scalars[first] == scalar;
+		return first != count && storage[first] == value;
+	}
+
+	constexpr void insert_bmp_non_ascii_code_unit(std::uint16_t code_unit) noexcept
+	{
+		insert_sorted_unique(
+			code_unit,
+			bmp_non_ascii_code_units,
+			bmp_non_ascii_count,
+			bmp_non_ascii_overflow);
+	}
+
+	constexpr void insert_supplementary_scalar(std::uint32_t scalar) noexcept
+	{
+		insert_sorted_unique(
+			scalar,
+			supplementary_scalars,
+			supplementary_count,
+			supplementary_overflow);
+	}
+
+	[[nodiscard]]
+	constexpr bool contains_bmp_non_ascii_code_unit(std::uint16_t code_unit) const noexcept
+	{
+		return contains_sorted(code_unit, bmp_non_ascii_code_units, bmp_non_ascii_count);
+	}
+
+	[[nodiscard]]
+	constexpr bool contains_supplementary_scalar(std::uint32_t scalar) const noexcept
+	{
+		return contains_sorted(scalar, supplementary_scalars, supplementary_count);
 	}
 };
 
@@ -659,6 +752,7 @@ inline constexpr utf16_predicate_match find_utf16_predicate_match(
 {
 	const auto has_ascii = matcher.has_ascii();
 	const auto has_non_ascii = matcher.has_non_ascii();
+	const auto has_supplementary = matcher.has_supplementary();
 	while (pos < base.size())
 	{
 		if (!has_ascii)
@@ -684,7 +778,7 @@ inline constexpr utf16_predicate_match find_utf16_predicate_match(
 
 		if (!details::is_utf16_high_surrogate(first))
 		{
-			if (has_non_ascii && matcher.matches_non_ascii_scalar(first))
+			if (has_non_ascii && matcher.matches_bmp_non_ascii(first))
 			{
 				return { pos, 1 };
 			}
@@ -693,7 +787,7 @@ inline constexpr utf16_predicate_match find_utf16_predicate_match(
 			continue;
 		}
 
-		if (has_non_ascii)
+		if (has_supplementary)
 		{
 			const auto scalar = details::decode_valid_utf16_char(base.data() + pos, 2u);
 			if (matcher.matches_non_ascii_scalar(scalar))
@@ -719,6 +813,7 @@ inline constexpr utf16_predicate_match rfind_utf16_predicate_match(
 	}
 
 	const auto has_non_ascii = matcher.has_non_ascii();
+	const auto has_supplementary = matcher.has_supplementary();
 	for (std::size_t pos = details::previous_utf16_scalar_boundary(base, end_exclusive);; pos = details::previous_utf16_scalar_boundary(base, pos))
 	{
 		const auto first = static_cast<std::uint16_t>(base[pos]);
@@ -732,12 +827,12 @@ inline constexpr utf16_predicate_match rfind_utf16_predicate_match(
 		}
 		else if (!details::is_utf16_high_surrogate(first))
 		{
-			if (has_non_ascii && matcher.matches_non_ascii_scalar(first))
+			if (has_non_ascii && matcher.matches_bmp_non_ascii(first))
 			{
 				return { pos, size };
 			}
 		}
-		else if (has_non_ascii)
+		else if (has_supplementary)
 		{
 			const auto scalar = details::decode_valid_utf16_char(base.data() + pos, size);
 			if (matcher.matches_non_ascii_scalar(scalar))
@@ -2921,11 +3016,6 @@ public:
 
 		pos = ceil_char_boundary((std::min)(size(), pos));
 		const details::utf16_char_span_matcher matcher{ chars };
-		if (!matcher.has_ascii() && !matcher.has_non_ascii_overflow())
-		{
-			return details::find_utf16_non_ascii_span_match(code_unit_view(), pos, matcher).pos;
-		}
-
 		return details::find_utf16_predicate_match(code_unit_view(), pos, matcher).pos;
 	}
 
@@ -3081,11 +3171,6 @@ public:
 
 		pos = floor_char_boundary((std::min)(size(), pos));
 		const details::utf16_char_span_matcher matcher{ chars };
-		if (!matcher.has_ascii() && !matcher.has_non_ascii_overflow())
-		{
-			return details::rfind_utf16_non_ascii_span_match(code_unit_view(), pos, matcher).pos;
-		}
-
 		const auto end_exclusive = pos == npos
 			? size()
 			: pos == size()
