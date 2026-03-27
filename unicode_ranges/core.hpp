@@ -1776,10 +1776,59 @@ namespace details
 			grapheme_indic_suffix_state indic_suffix = grapheme_indic_suffix_state::none;
 		};
 
+		struct grapheme_scalar_info
+		{
+			std::uint32_t scalar = 0;
+			unicode::grapheme_cluster_break_property break_property = unicode::grapheme_cluster_break_property::other;
+			unicode::indic_conjunct_break_property indic_property = unicode::indic_conjunct_break_property::none;
+			bool extended_pictographic = false;
+		};
+
 		inline constexpr bool is_grapheme_control(unicode::grapheme_cluster_break_property value) noexcept
 		{
 			using enum unicode::grapheme_cluster_break_property;
 			return value == cr || value == lf || value == control;
+		}
+
+		inline constexpr grapheme_scalar_info classify_grapheme_scalar(std::uint32_t scalar) noexcept
+		{
+			return grapheme_scalar_info{
+				.scalar = scalar,
+				.break_property = unicode::grapheme_cluster_break(scalar),
+				.indic_property = unicode::indic_conjunct_break(scalar),
+				.extended_pictographic = unicode::is_extended_pictographic(scalar)
+			};
+		}
+
+		inline constexpr grapheme_emoji_suffix_state advance_emoji_suffix(
+			grapheme_emoji_suffix_state state,
+			const grapheme_scalar_info& scalar_info) noexcept
+		{
+			if (scalar_info.extended_pictographic)
+			{
+				return grapheme_emoji_suffix_state::extended_pictographic;
+			}
+
+			using enum unicode::grapheme_cluster_break_property;
+			switch (scalar_info.break_property)
+			{
+			case extend:
+				if (state == grapheme_emoji_suffix_state::extended_pictographic
+					|| state == grapheme_emoji_suffix_state::extended_pictographic_extend)
+				{
+					return grapheme_emoji_suffix_state::extended_pictographic_extend;
+				}
+				return grapheme_emoji_suffix_state::none;
+			case zwj:
+				if (state == grapheme_emoji_suffix_state::extended_pictographic
+					|| state == grapheme_emoji_suffix_state::extended_pictographic_extend)
+				{
+					return grapheme_emoji_suffix_state::extended_pictographic_extend_zwj;
+				}
+				return grapheme_emoji_suffix_state::none;
+			default:
+				return grapheme_emoji_suffix_state::none;
+			}
 		}
 
 		inline constexpr grapheme_emoji_suffix_state advance_emoji_suffix(
@@ -1811,6 +1860,34 @@ namespace details
 				return grapheme_emoji_suffix_state::none;
 			default:
 				return grapheme_emoji_suffix_state::none;
+			}
+		}
+
+		inline constexpr grapheme_indic_suffix_state advance_indic_suffix(
+			grapheme_indic_suffix_state state,
+			const grapheme_scalar_info& scalar_info) noexcept
+		{
+			using enum unicode::indic_conjunct_break_property;
+			switch (scalar_info.indic_property)
+			{
+			case consonant:
+				return grapheme_indic_suffix_state::consonant_no_linker;
+			case extend:
+				if (state == grapheme_indic_suffix_state::consonant_no_linker
+					|| state == grapheme_indic_suffix_state::consonant_linker)
+				{
+					return state;
+				}
+				return grapheme_indic_suffix_state::none;
+			case linker:
+				if (state == grapheme_indic_suffix_state::consonant_no_linker
+					|| state == grapheme_indic_suffix_state::consonant_linker)
+				{
+					return grapheme_indic_suffix_state::consonant_linker;
+				}
+				return grapheme_indic_suffix_state::none;
+			default:
+				return grapheme_indic_suffix_state::none;
 			}
 		}
 
@@ -1854,6 +1931,17 @@ namespace details
 			};
 		}
 
+		inline constexpr grapheme_state make_initial_grapheme_state(const grapheme_scalar_info& scalar_info) noexcept
+		{
+			return grapheme_state{
+				.previous_break = scalar_info.break_property,
+				.trailing_regional_indicator_count =
+					scalar_info.break_property == unicode::grapheme_cluster_break_property::regional_indicator ? 1u : 0u,
+				.emoji_suffix = advance_emoji_suffix(grapheme_emoji_suffix_state::none, scalar_info),
+				.indic_suffix = advance_indic_suffix(grapheme_indic_suffix_state::none, scalar_info)
+			};
+		}
+
 		inline constexpr void consume_grapheme_scalar(grapheme_state& state, std::uint32_t scalar) noexcept
 		{
 			const auto break_property = unicode::grapheme_cluster_break(scalar);
@@ -1869,6 +1957,24 @@ namespace details
 
 			state.emoji_suffix = advance_emoji_suffix(state.emoji_suffix, scalar, break_property);
 			state.indic_suffix = advance_indic_suffix(state.indic_suffix, scalar);
+		}
+
+		inline constexpr void consume_grapheme_scalar(
+			grapheme_state& state,
+			const grapheme_scalar_info& scalar_info) noexcept
+		{
+			state.previous_break = scalar_info.break_property;
+			if (scalar_info.break_property == unicode::grapheme_cluster_break_property::regional_indicator)
+			{
+				++state.trailing_regional_indicator_count;
+			}
+			else
+			{
+				state.trailing_regional_indicator_count = 0;
+			}
+
+			state.emoji_suffix = advance_emoji_suffix(state.emoji_suffix, scalar_info);
+			state.indic_suffix = advance_indic_suffix(state.indic_suffix, scalar_info);
 		}
 
 		inline constexpr bool should_continue_grapheme_cluster(
@@ -1942,6 +2048,85 @@ namespace details
 			return false;
 		}
 
+		inline constexpr bool should_continue_grapheme_cluster(
+			const grapheme_state& state,
+			const grapheme_scalar_info& scalar_info) noexcept
+		{
+			using enum unicode::grapheme_cluster_break_property;
+
+			const auto current_break = scalar_info.break_property;
+			const auto previous_break = state.previous_break;
+
+			if (previous_break == other
+				&& current_break == other
+				&& state.emoji_suffix == grapheme_emoji_suffix_state::none
+				&& state.indic_suffix == grapheme_indic_suffix_state::none) [[likely]]
+			{
+				return false;
+			}
+
+			if (previous_break == cr && current_break == lf)
+			{
+				return true;
+			}
+
+			if (is_grapheme_control(previous_break) || is_grapheme_control(current_break))
+			{
+				return false;
+			}
+
+			if (previous_break == l && (current_break == l || current_break == v || current_break == lv || current_break == lvt))
+			{
+				return true;
+			}
+
+			if ((previous_break == lv || previous_break == v) && (current_break == v || current_break == t))
+			{
+				return true;
+			}
+
+			if ((previous_break == lvt || previous_break == t) && current_break == t)
+			{
+				return true;
+			}
+
+			if (state.indic_suffix == grapheme_indic_suffix_state::consonant_linker
+				&& scalar_info.indic_property == unicode::indic_conjunct_break_property::consonant)
+			{
+				return true;
+			}
+
+			if (current_break == extend || current_break == zwj)
+			{
+				return true;
+			}
+
+			if (current_break == spacing_mark)
+			{
+				return true;
+			}
+
+			if (previous_break == prepend)
+			{
+				return true;
+			}
+
+			if (state.emoji_suffix == grapheme_emoji_suffix_state::extended_pictographic_extend_zwj
+				&& scalar_info.extended_pictographic)
+			{
+				return true;
+			}
+
+			if (previous_break == regional_indicator
+				&& current_break == regional_indicator
+				&& (state.trailing_regional_indicator_count % 2u) == 1u)
+			{
+				return true;
+			}
+
+			return false;
+		}
+
 		inline constexpr std::size_t next_grapheme_boundary(std::u8string_view text, std::size_t index) noexcept
 		{
 			if (index >= text.size()) [[unlikely]]
@@ -1952,18 +2137,18 @@ namespace details
 			const auto* const begin = text.data();
 			const auto* const end = begin + text.size();
 			auto position = begin + index;
-			auto state = make_initial_grapheme_state(decode_next_utf8_scalar(position));
+			auto state = make_initial_grapheme_state(classify_grapheme_scalar(decode_next_utf8_scalar(position)));
 
 			while (position < end)
 			{
 				auto next_position = position;
-				const auto next_scalar = decode_next_utf8_scalar(next_position);
-				if (!should_continue_grapheme_cluster(state, next_scalar))
+				const auto next_scalar_info = classify_grapheme_scalar(decode_next_utf8_scalar(next_position));
+				if (!should_continue_grapheme_cluster(state, next_scalar_info))
 				{
 					return static_cast<std::size_t>(position - begin);
 				}
 
-				consume_grapheme_scalar(state, next_scalar);
+				consume_grapheme_scalar(state, next_scalar_info);
 				position = next_position;
 			}
 
@@ -1980,18 +2165,18 @@ namespace details
 			const auto* const begin = text.data();
 			const auto* const end = begin + text.size();
 			auto position = begin + index;
-			auto state = make_initial_grapheme_state(decode_next_utf16_scalar(position));
+			auto state = make_initial_grapheme_state(classify_grapheme_scalar(decode_next_utf16_scalar(position)));
 
 			while (position < end)
 			{
 				auto next_position = position;
-				const auto next_scalar = decode_next_utf16_scalar(next_position);
-				if (!should_continue_grapheme_cluster(state, next_scalar))
+				const auto next_scalar_info = classify_grapheme_scalar(decode_next_utf16_scalar(next_position));
+				if (!should_continue_grapheme_cluster(state, next_scalar_info))
 				{
 					return static_cast<std::size_t>(position - begin);
 				}
 
-				consume_grapheme_scalar(state, next_scalar);
+				consume_grapheme_scalar(state, next_scalar_info);
 				position = next_position;
 			}
 
@@ -2055,21 +2240,21 @@ namespace details
 				}
 
 				auto next_position = position;
-				const auto scalar = decode_next_utf8_scalar(next_position);
+				const auto scalar_info = classify_grapheme_scalar(decode_next_utf8_scalar(next_position));
 				if (!has_state)
 				{
 					++count;
-					state = make_initial_grapheme_state(scalar);
+					state = make_initial_grapheme_state(scalar_info);
 					has_state = true;
 				}
-				else if (!should_continue_grapheme_cluster(state, scalar))
+				else if (!should_continue_grapheme_cluster(state, scalar_info))
 				{
 					++count;
-					state = make_initial_grapheme_state(scalar);
+					state = make_initial_grapheme_state(scalar_info);
 				}
 				else
 				{
-					consume_grapheme_scalar(state, scalar);
+					consume_grapheme_scalar(state, scalar_info);
 				}
 
 				position = next_position;
@@ -2110,21 +2295,21 @@ namespace details
 				}
 
 				auto next_position = position;
-				const auto scalar = decode_next_utf16_scalar(next_position);
+				const auto scalar_info = classify_grapheme_scalar(decode_next_utf16_scalar(next_position));
 				if (!has_state)
 				{
 					++count;
-					state = make_initial_grapheme_state(scalar);
+					state = make_initial_grapheme_state(scalar_info);
 					has_state = true;
 				}
-				else if (!should_continue_grapheme_cluster(state, scalar))
+				else if (!should_continue_grapheme_cluster(state, scalar_info))
 				{
 					++count;
-					state = make_initial_grapheme_state(scalar);
+					state = make_initial_grapheme_state(scalar_info);
 				}
 				else
 				{
-					consume_grapheme_scalar(state, scalar);
+					consume_grapheme_scalar(state, scalar_info);
 				}
 
 				position = next_position;
