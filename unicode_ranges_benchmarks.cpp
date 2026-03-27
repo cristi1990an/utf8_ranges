@@ -287,6 +287,18 @@ int main(int argc, char** argv)
 		u"élan αβγ déjà vu straße café "sv,
 		2048);
 
+	const auto utf8_validate_storage = repeat_text(
+		u8"ASCII caf\u00E9 \u03A9mega \U0001F600 done "sv,
+		4096);
+	const auto utf8_grapheme_storage = repeat_text(
+		u8"e\u0301 \U0001F469\u200D\U0001F4BB \U0001F1F7\U0001F1F4 "sv,
+		2048);
+	const auto utf16_grapheme_storage = repeat_text(
+		u"e\u0301 \U0001F469\u200D\U0001F4BB \U0001F1F7\U0001F1F4 "sv,
+		2048);
+	const auto utf8_grapheme_text = utf8_string_view::from_bytes_unchecked(utf8_grapheme_storage);
+	const auto utf16_grapheme_text = utf16_string_view::from_code_units_unchecked(utf16_grapheme_storage);
+
 	assert(utf8_string_view::from_bytes_unchecked(utf8_ascii_upper_storage).to_ascii_lowercase()
 		== utf8_string_view::from_bytes_unchecked(utf8_ascii_lower_storage));
 	assert(utf16_string_view::from_code_units_unchecked(utf16_ascii_upper_storage).to_ascii_lowercase()
@@ -295,9 +307,19 @@ int main(int argc, char** argv)
 		== utf8_string_view::from_bytes_unchecked(utf8_mixed_lower_storage));
 	assert(utf16_string_view::from_code_units_unchecked(utf16_mixed_upper_storage).to_lowercase()
 		== utf16_string_view::from_code_units_unchecked(utf16_mixed_lower_storage));
+	assert(details::validate_utf8(std::u8string_view{ utf8_validate_storage }).has_value());
+	assert(utf8_grapheme_text.grapheme_count() != 0);
+	assert(utf16_grapheme_text.grapheme_count() != 0);
 
 	const auto utf8_chars = make_utf8_char_vector(u8"AbC-éß🙂 "sv, 4096);
 	const auto utf16_chars = make_utf16_char_vector(u"AbC-éß🙂 "sv, 4096);
+
+	std::vector<std::uint32_t> utf8_char_scalars;
+	utf8_char_scalars.reserve(utf8_chars.size());
+	for (const auto ch : utf8_chars)
+	{
+		utf8_char_scalars.push_back(ch.as_scalar());
+	}
 
 	{
 		utf8_string s;
@@ -311,7 +333,7 @@ int main(int argc, char** argv)
 	}
 
 	std::vector<benchmark_case> cases;
-	cases.reserve(24);
+	cases.reserve(29);
 
 	cases.push_back({
 		"utf8.find.long_needle",
@@ -365,6 +387,63 @@ int main(int argc, char** argv)
 		[&]() -> std::size_t
 		{
 			return utf16_span_find_haystack.find(std::span{ utf16_small_any_of });
+		}
+	});
+	cases.push_back({
+		"utf8.validate.mixed",
+		utf8_validate_storage.size(),
+		16,
+		[&]() -> std::size_t
+		{
+			return details::validate_utf8(std::u8string_view{ utf8_validate_storage }).has_value()
+				? utf8_validate_storage.size()
+				: 0u;
+		}
+	});
+	cases.push_back({
+		"utf8.grapheme_count.mixed",
+		utf8_grapheme_storage.size(),
+		8,
+		[&]() -> std::size_t
+		{
+			return utf8_grapheme_text.grapheme_count();
+		}
+	});
+	cases.push_back({
+		"utf16.grapheme_count.mixed",
+		utf16_grapheme_storage.size() * sizeof(char16_t),
+		8,
+		[&]() -> std::size_t
+		{
+			return utf16_grapheme_text.grapheme_count();
+		}
+	});
+	cases.push_back({
+		"utf8_char.as_scalar.mixed",
+		utf8_chars.size() * 4u,
+		8,
+		[&]() -> std::size_t
+		{
+			std::size_t sum = 0;
+			for (const auto ch : utf8_chars)
+			{
+				sum += ch.as_scalar();
+			}
+			return sum;
+		}
+	});
+	cases.push_back({
+		"utf8_char.from_scalar.mixed",
+		utf8_char_scalars.size() * 4u,
+		8,
+		[&]() -> std::size_t
+		{
+			std::size_t sum = 0;
+			for (const auto scalar : utf8_char_scalars)
+			{
+				sum += utf8_char::from_scalar_unchecked(scalar).code_unit_count();
+			}
+			return sum;
 		}
 	});
 

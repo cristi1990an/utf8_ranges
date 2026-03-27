@@ -2416,20 +2416,23 @@ inline void run_unicode_ranges_tests()
 			details::copy_ascii_utf16_to_utf8(narrowed.data(), std::u16string_view{ ascii_storage });
 			assert(narrowed == u8"AbCdEfGhIjKlMnOpQrStUvWxYz0123456789");
 
-			if constexpr (sizeof(wchar_t) == 2)
+			[&]<typename WideChar = wchar_t>()
 			{
-				const std::wstring ascii_wide = L"AbCdEfGhIjKlMnOpQrStUvWxYz0123456789";
-				[[maybe_unused]] const auto validated = details::validate_utf16(std::wstring_view{ ascii_wide });
-				assert(validated.has_value());
-				const auto copied = details::copy_validated_utf16_code_units(std::wstring_view{ ascii_wide }, std::allocator<char16_t>{});
-				assert(copied.has_value());
-				const auto copied_view = std::u16string_view{ copied->data(), copied->size() };
-				assert(copied_view == std::u16string_view{ ascii_storage });
-				const auto transcoded = details::transcode_utf16_to_utf8_checked(std::wstring_view{ ascii_wide }, std::allocator<char8_t>{});
-				assert(transcoded.has_value());
-				const auto transcoded_view = std::u8string_view{ transcoded->data(), transcoded->size() };
-				assert(transcoded_view == u8"AbCdEfGhIjKlMnOpQrStUvWxYz0123456789");
-			}
+				if constexpr (sizeof(WideChar) == 2)
+				{
+					const std::basic_string_view<WideChar> ascii_wide = L"AbCdEfGhIjKlMnOpQrStUvWxYz0123456789";
+					[[maybe_unused]] const auto validated = details::validate_utf16(std::basic_string_view<WideChar>{ ascii_wide });
+					assert(validated.has_value());
+					const auto copied = details::copy_validated_utf16_code_units(std::basic_string_view<WideChar>{ ascii_wide }, std::allocator<char16_t>{});
+					assert(copied.has_value());
+					const auto copied_view = std::u16string_view{ copied->data(), copied->size() };
+					assert(copied_view == std::u16string_view{ ascii_storage });
+					const auto transcoded = details::transcode_utf16_to_utf8_checked(std::basic_string_view<WideChar>{ ascii_wide }, std::allocator<char8_t>{});
+					assert(transcoded.has_value());
+					const auto transcoded_view = std::u8string_view{ transcoded->data(), transcoded->size() };
+					assert(transcoded_view == u8"AbCdEfGhIjKlMnOpQrStUvWxYz0123456789");
+				}
+			}();
 		}
 		{
 			assert(u"AbC-\u00E9\u00DF"_utf16_sv.to_ascii_lowercase() == u"abc-\u00E9\u00DF"_utf16_sv);
@@ -3840,6 +3843,30 @@ static_assert(noexcept(utf16_string{}.reverse()));
 		assert(!result.has_value());
 		assert(result.error().code == utf8_error_code::invalid_lead_byte);
 		assert(result.error().first_invalid_byte_index == 1);
+	}
+	{
+		const auto result = utf8_string::from_bytes(std::string_view{ "\xE2\x82", 2 });
+		assert(!result.has_value());
+		assert(result.error().code == utf8_error_code::truncated_sequence);
+		assert(result.error().first_invalid_byte_index == 0);
+	}
+	{
+		const auto result = utf8_string::from_bytes(std::string_view{ "\xE0\x80\x80", 3 });
+		assert(!result.has_value());
+		assert(result.error().code == utf8_error_code::invalid_sequence);
+		assert(result.error().first_invalid_byte_index == 0);
+	}
+	{
+		const auto result = utf8_string::from_bytes(std::string_view{ "\xED\xA0\x80", 3 });
+		assert(!result.has_value());
+		assert(result.error().code == utf8_error_code::invalid_sequence);
+		assert(result.error().first_invalid_byte_index == 0);
+	}
+	{
+		const auto result = utf8_string::from_bytes(std::string_view{ "\xF4\x90\x80\x80", 4 });
+		assert(!result.has_value());
+		assert(result.error().code == utf8_error_code::invalid_sequence);
+		assert(result.error().first_invalid_byte_index == 0);
 	}
 	// Formatting, hashing, and stream insertion for borrowed and owning strings.
 	assert(std::format("{}", utf8_text) == "Aé€");

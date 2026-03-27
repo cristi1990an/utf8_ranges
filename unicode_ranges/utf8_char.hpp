@@ -49,14 +49,62 @@ public:
 	static constexpr utf8_char from_utf8_bytes_unchecked(const CharT* bytes, std::size_t size) noexcept
 	{
 		utf8_char value;
-		std::ranges::copy_n(bytes, size, value.bytes_.begin());
+		switch (size)
+		{
+		case details::encoding_constants::single_code_unit_count:
+			value.bytes_[0] = static_cast<char8_t>(bytes[0]);
+			break;
+		case details::encoding_constants::two_code_unit_count:
+			value.bytes_[0] = static_cast<char8_t>(bytes[0]);
+			value.bytes_[1] = static_cast<char8_t>(bytes[1]);
+			break;
+		case details::encoding_constants::three_code_unit_count:
+			value.bytes_[0] = static_cast<char8_t>(bytes[0]);
+			value.bytes_[1] = static_cast<char8_t>(bytes[1]);
+			value.bytes_[2] = static_cast<char8_t>(bytes[2]);
+			break;
+		default:
+			value.bytes_[0] = static_cast<char8_t>(bytes[0]);
+			value.bytes_[1] = static_cast<char8_t>(bytes[1]);
+			value.bytes_[2] = static_cast<char8_t>(bytes[2]);
+			value.bytes_[3] = static_cast<char8_t>(bytes[3]);
+			break;
+		}
 		return value;
 	}
 
 	[[nodiscard]]
 	constexpr std::uint32_t as_scalar() const noexcept
 	{
-		return details::decode_valid_utf8_char(bytes_.data(), code_unit_count());
+		const auto b0 = static_cast<std::uint8_t>(bytes_[0]);
+		if (b0 <= details::encoding_constants::ascii_scalar_max) [[likely]]
+		{
+			return b0;
+		}
+
+		if (b0 <= details::encoding_constants::utf8_two_byte_lead_max)
+		{
+			return (static_cast<std::uint32_t>(b0 & details::encoding_constants::utf8_two_byte_payload_mask)
+				<< details::encoding_constants::utf8_two_byte_lead_shift)
+				| (static_cast<std::uint32_t>(static_cast<std::uint8_t>(bytes_[1]) & details::encoding_constants::utf8_continuation_payload_mask));
+		}
+
+		if (b0 <= details::encoding_constants::utf8_three_byte_lead_max)
+		{
+			return (static_cast<std::uint32_t>(b0 & details::encoding_constants::utf8_three_byte_payload_mask)
+				<< details::encoding_constants::utf8_three_byte_lead_shift)
+				| (static_cast<std::uint32_t>(static_cast<std::uint8_t>(bytes_[1]) & details::encoding_constants::utf8_continuation_payload_mask)
+					<< details::encoding_constants::utf8_continuation_payload_bits)
+				| (static_cast<std::uint32_t>(static_cast<std::uint8_t>(bytes_[2]) & details::encoding_constants::utf8_continuation_payload_mask));
+		}
+
+		return (static_cast<std::uint32_t>(b0 & details::encoding_constants::utf8_four_byte_payload_mask)
+			<< details::encoding_constants::utf8_four_byte_lead_shift)
+			| (static_cast<std::uint32_t>(static_cast<std::uint8_t>(bytes_[1]) & details::encoding_constants::utf8_continuation_payload_mask)
+				<< details::encoding_constants::utf8_three_byte_lead_shift)
+			| (static_cast<std::uint32_t>(static_cast<std::uint8_t>(bytes_[2]) & details::encoding_constants::utf8_continuation_payload_mask)
+				<< details::encoding_constants::utf8_continuation_payload_bits)
+			| (static_cast<std::uint32_t>(static_cast<std::uint8_t>(bytes_[3]) & details::encoding_constants::utf8_continuation_payload_mask));
 	}
 
 	constexpr operator utf16_char() const noexcept;
@@ -639,9 +687,27 @@ public:
 		&& std::output_iterator<OutIt, CharT>)
 	constexpr std::size_t encode_utf8(OutIt out) const noexcept
 	{
-		const auto text = as_view();
-		std::ranges::copy_n(text.data(), text.size(), out);
-		return text.size();
+		const auto size = code_unit_count();
+		*out++ = static_cast<CharT>(bytes_[0]);
+		if (size == details::encoding_constants::single_code_unit_count) [[likely]]
+		{
+			return details::encoding_constants::single_code_unit_count;
+		}
+
+		*out++ = static_cast<CharT>(bytes_[1]);
+		if (size == details::encoding_constants::two_code_unit_count)
+		{
+			return details::encoding_constants::two_code_unit_count;
+		}
+
+		*out++ = static_cast<CharT>(bytes_[2]);
+		if (size == details::encoding_constants::three_code_unit_count)
+		{
+			return details::encoding_constants::three_code_unit_count;
+		}
+
+		*out++ = static_cast<CharT>(bytes_[3]);
+		return details::encoding_constants::max_utf8_code_units;
 	}
 
 	template<typename CharT, typename OutIt>
@@ -776,15 +842,61 @@ private:
 			return false;
 		}
 
-		bytes_.fill(0);
-		details::encode_unicode_scalar_utf8_unchecked(scalar, bytes_.data());
+		assign_scalar_unchecked(scalar);
 		return true;
 	}
 
 	constexpr void assign_scalar_unchecked(std::uint32_t scalar) noexcept
 	{
-		bytes_.fill(0);
-		details::encode_unicode_scalar_utf8_unchecked(scalar, bytes_.data());
+		if (scalar <= details::encoding_constants::ascii_scalar_max) [[likely]]
+		{
+			set_ascii(static_cast<std::uint8_t>(scalar));
+			return;
+		}
+
+		if (scalar <= details::encoding_constants::two_byte_scalar_max)
+		{
+			set_two(
+				static_cast<std::uint8_t>(
+					details::encoding_constants::utf8_two_byte_prefix_value
+					| (scalar >> details::encoding_constants::utf8_two_byte_lead_shift)),
+				static_cast<std::uint8_t>(
+					details::encoding_constants::utf8_continuation_tag
+					| (scalar & details::encoding_constants::utf8_continuation_payload_mask)));
+			return;
+		}
+
+		if (scalar <= details::encoding_constants::bmp_scalar_max)
+		{
+			set_three(
+				static_cast<std::uint8_t>(
+					details::encoding_constants::utf8_three_byte_prefix_value
+					| (scalar >> details::encoding_constants::utf8_three_byte_lead_shift)),
+				static_cast<std::uint8_t>(
+					details::encoding_constants::utf8_continuation_tag
+					| ((scalar >> details::encoding_constants::utf8_continuation_payload_bits)
+						& details::encoding_constants::utf8_continuation_payload_mask)),
+				static_cast<std::uint8_t>(
+					details::encoding_constants::utf8_continuation_tag
+					| (scalar & details::encoding_constants::utf8_continuation_payload_mask)));
+			return;
+		}
+
+		set_four(
+			static_cast<std::uint8_t>(
+				details::encoding_constants::utf8_four_byte_prefix_value
+				| (scalar >> details::encoding_constants::utf8_four_byte_lead_shift)),
+			static_cast<std::uint8_t>(
+				details::encoding_constants::utf8_continuation_tag
+				| ((scalar >> details::encoding_constants::utf8_three_byte_lead_shift)
+					& details::encoding_constants::utf8_continuation_payload_mask)),
+			static_cast<std::uint8_t>(
+				details::encoding_constants::utf8_continuation_tag
+				| ((scalar >> details::encoding_constants::utf8_continuation_payload_bits)
+					& details::encoding_constants::utf8_continuation_payload_mask)),
+			static_cast<std::uint8_t>(
+				details::encoding_constants::utf8_continuation_tag
+				| (scalar & details::encoding_constants::utf8_continuation_payload_mask)));
 	}
 
 	std::array<char8_t, details::encoding_constants::max_utf8_code_units> bytes_{};
