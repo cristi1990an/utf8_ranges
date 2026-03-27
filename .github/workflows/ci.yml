@@ -5,6 +5,7 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
   schedule:
     - cron: "0 6 * * 1"
 
@@ -253,3 +254,75 @@ jobs:
         with:
           name: coverage-report
           path: coverage/
+
+  benchmarks:
+    name: Benchmark (${{ matrix.name }}, ${{ matrix.opt_name }}, C++23)
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: GCC
+            install_kind: gcc
+            packages: g++-14
+            cxx: g++-14
+            cxxflags: ""
+            opt_name: O3
+            opt_flags: "-O3 -DNDEBUG"
+            output: unicode_ranges_benchmarks_gcc_o3
+            artifact_name: benchmark-gcc-o3
+          - name: Clang trunk
+            install_kind: clang
+            packages: clang-22 libc++-22-dev libc++abi-22-dev
+            cxx: clang++-22
+            cxxflags: "-stdlib=libc++"
+            opt_name: O2
+            opt_flags: "-O2 -DNDEBUG"
+            output: unicode_ranges_benchmarks_clang_o2
+            artifact_name: benchmark-clang-o2
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install GCC
+        if: matrix.install_kind == 'gcc'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.packages }}
+
+      - name: Install Clang trunk
+        if: matrix.install_kind == 'clang'
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 22
+          sudo apt-get install -y ${{ matrix.packages }}
+
+      - name: Show compiler version
+        run: ${{ matrix.cxx }} --version
+
+      - name: Build benchmark runner
+        run: ${{ matrix.cxx }} -std=c++23 ${{ matrix.opt_flags }} -Wall -Wextra -Werror -pedantic ${{ matrix.cxxflags }} unicode_ranges_benchmarks.cpp -o ${{ matrix.output }}
+
+      - name: Run benchmark suite
+        run: ./${{ matrix.output }} --min-ms=300 > benchmark-results.txt
+
+      - name: Publish benchmark summary
+        run: |
+          {
+            echo "## Benchmarks (${{ matrix.name }}, ${{ matrix.opt_name }})"
+            echo
+            echo "_Shared CI runners are noisy; treat these as directional numbers._"
+            echo
+            echo '```text'
+            cat benchmark-results.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload benchmark artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: benchmark-results.txt
