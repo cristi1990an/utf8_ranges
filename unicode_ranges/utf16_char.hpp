@@ -6,6 +6,14 @@
 namespace unicode_ranges
 {
 
+struct utf16_char;
+
+namespace details
+{
+	[[nodiscard]]
+	constexpr std::u16string_view utf16_char_view(const utf16_char& ch) noexcept;
+}
+
 struct utf16_char
 {
 public:
@@ -57,19 +65,12 @@ public:
 	[[nodiscard]]
 	constexpr std::uint32_t as_scalar() const noexcept
 	{
-		return details::decode_valid_utf16_char(as_view());
-	}
+		if (code_units_[1] == 0) [[likely]]
+		{
+			return static_cast<std::uint16_t>(code_units_[0]);
+		}
 
-	[[nodiscard]]
-	constexpr operator std::u16string_view() const noexcept
-	{
-		return as_view();
-	}
-
-	[[nodiscard]]
-	constexpr std::u16string_view as_view() const noexcept
-	{
-		return { code_units_.data(), code_unit_count() };
+		return details::decode_valid_utf16_char(code_units_.data(), code_unit_count());
 	}
 
 	constexpr operator utf8_char() const noexcept;
@@ -79,22 +80,41 @@ public:
 
 	constexpr utf16_char& operator++() noexcept
 	{
-		auto scalar = as_scalar();
-		if (scalar == details::encoding_constants::max_unicode_scalar)
+		const auto first = static_cast<std::uint16_t>(code_units_[0]);
+		if (!details::is_utf16_high_surrogate(first)) [[likely]]
 		{
-			scalar = 0u;
+			if (first == details::encoding_constants::bmp_scalar_max)
+			{
+				code_units_[0] = static_cast<char16_t>(details::encoding_constants::high_surrogate_min);
+				code_units_[1] = static_cast<char16_t>(details::encoding_constants::low_surrogate_min);
+				return *this;
+			}
+
+			const auto next = first + 1u;
+			code_units_[0] = static_cast<char16_t>(
+				next == details::encoding_constants::high_surrogate_min
+					? details::encoding_constants::scalar_after_surrogate_range
+					: next);
+			return *this;
+		}
+
+		const auto second = static_cast<std::uint16_t>(code_units_[1]);
+		if (second < details::encoding_constants::low_surrogate_max)
+		{
+			code_units_[1] = static_cast<char16_t>(second + 1u);
+			return *this;
+		}
+
+		code_units_[1] = static_cast<char16_t>(details::encoding_constants::low_surrogate_min);
+		if (first < details::encoding_constants::high_surrogate_max)
+		{
+			code_units_[0] = static_cast<char16_t>(first + 1u);
 		}
 		else
 		{
-			++scalar;
-			if (scalar >= details::encoding_constants::high_surrogate_min
-				&& scalar <= details::encoding_constants::low_surrogate_max)
-			{
-				scalar = details::encoding_constants::scalar_after_surrogate_range;
-			}
+			code_units_[0] = 0;
 		}
 
-		assign_scalar_unchecked(scalar);
 		return *this;
 	}
 
@@ -107,22 +127,41 @@ public:
 
 	constexpr utf16_char& operator--() noexcept
 	{
-		auto scalar = as_scalar();
-		if (scalar == 0u)
+		const auto first = static_cast<std::uint16_t>(code_units_[0]);
+		if (!details::is_utf16_high_surrogate(first)) [[likely]]
 		{
-			scalar = details::encoding_constants::max_unicode_scalar;
+			if (first == 0u)
+			{
+				code_units_[0] = static_cast<char16_t>(details::encoding_constants::high_surrogate_max);
+				code_units_[1] = static_cast<char16_t>(details::encoding_constants::low_surrogate_max);
+				return *this;
+			}
+
+			code_units_[0] = static_cast<char16_t>(
+				first == details::encoding_constants::scalar_after_surrogate_range
+					? details::encoding_constants::scalar_before_surrogate_range
+					: first - 1u);
+			return *this;
+		}
+
+		const auto second = static_cast<std::uint16_t>(code_units_[1]);
+		if (second > details::encoding_constants::low_surrogate_min)
+		{
+			code_units_[1] = static_cast<char16_t>(second - 1u);
+			return *this;
+		}
+
+		if (first > details::encoding_constants::high_surrogate_min)
+		{
+			code_units_[0] = static_cast<char16_t>(first - 1u);
+			code_units_[1] = static_cast<char16_t>(details::encoding_constants::low_surrogate_max);
 		}
 		else
 		{
-			--scalar;
-			if (scalar >= details::encoding_constants::high_surrogate_min
-				&& scalar <= details::encoding_constants::low_surrogate_max)
-			{
-				scalar = details::encoding_constants::scalar_before_surrogate_range;
-			}
+			code_units_[0] = static_cast<char16_t>(details::encoding_constants::scalar_before_surrogate_range);
+			code_units_[1] = 0;
 		}
 
-		assign_scalar_unchecked(scalar);
 		return *this;
 	}
 
@@ -136,7 +175,8 @@ public:
 	[[nodiscard]]
 	constexpr bool is_ascii() const noexcept
 	{
-		return as_scalar() <= details::encoding_constants::ascii_scalar_max;
+		return code_units_[1] == 0
+			&& static_cast<std::uint16_t>(code_units_[0]) <= details::encoding_constants::ascii_scalar_max;
 	}
 
 	[[nodiscard]]
@@ -355,7 +395,7 @@ public:
 		&& std::output_iterator<OutIt, CharT>)
 	constexpr std::size_t encode_utf16(OutIt out) const noexcept
 	{
-		const auto text = static_cast<std::basic_string_view<char16_t>>(*this);
+		const auto text = as_view();
 		std::ranges::copy_n(text.data(), text.size(), out);
 		return text.size();
 	}
@@ -390,6 +430,14 @@ public:
 	}
 
 private:
+	friend constexpr std::u16string_view details::utf16_char_view(const utf16_char& ch) noexcept;
+
+	[[nodiscard]]
+	constexpr std::u16string_view as_view() const noexcept
+	{
+		return { code_units_.data(), code_unit_count() };
+	}
+
 	static constexpr bool is_ascii_lower_alpha(std::uint8_t value) noexcept
 	{
 		return value >= 'a' && value <= 'z';
@@ -440,6 +488,15 @@ inline constexpr utf16_char::operator utf8_char() const noexcept
 	return utf8_char::from_scalar_unchecked(as_scalar());
 }
 
+namespace details
+{
+	[[nodiscard]]
+	inline constexpr std::u16string_view utf16_char_view(const utf16_char& ch) noexcept
+	{
+		return ch.as_view();
+	}
+}
+
 namespace literals
 {
 	template<details::literals::constexpr_utf16_character Str>
@@ -459,7 +516,7 @@ namespace std
 	{
 		std::size_t operator()(const unicode_ranges::utf16_char& value) const noexcept
 		{
-			return std::hash<std::u16string_view>{}(value.as_view());
+			return std::hash<std::u16string_view>{}(unicode_ranges::details::utf16_char_view(value));
 		}
 	};
 

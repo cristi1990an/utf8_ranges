@@ -4,4 +4,5 @@
     <Platform Name="x86" />
   </Configurations>
   <Project Path="unicode_ranges.vcxproj" Id="145ebcbd-1896-42ae-ad89-d25964826d92" />
+  <Project Path="unicode_ranges_benchmarks.vcxproj" Id="2f72119e-6618-4d65-bf77-1205e17fa567" />
 </Solution>

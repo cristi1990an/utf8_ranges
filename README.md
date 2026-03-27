@@ -30,9 +30,8 @@ It provides validated UTF-8 and UTF-16 characters, borrowed views, owning string
 
 > [!IMPORTANT]
 > Borrowed APIs return views or ranges into existing storage.
-> `chars()`, `reversed_chars()`, `graphemes()`, `reversed_graphemes()`, `char_indices()`, `grapheme_indices()`, `as_view()`, and `as_utf8_view()` do not own their data.
+> `chars()`, `reversed_chars()`, `graphemes()`, `char_indices()`, and `grapheme_indices()` do not own their data.
 > Do not let them outlive the underlying string storage, and do not keep them across mutations of an owning string.
-> For `utf8_char` and `utf16_char`, the borrowed views point into the character object itself.
 
 ## Contents
 
@@ -413,10 +412,6 @@ struct utf8_char
         const CharT* bytes, std::size_t size) noexcept;
 
     constexpr std::uint32_t as_scalar() const noexcept;
-    constexpr std::u8string_view as_view() const noexcept;
-    constexpr utf8_string_view as_utf8_view() const noexcept;
-    constexpr operator std::u8string_view() const noexcept;
-
     constexpr utf8_char& operator++() noexcept;
     constexpr utf8_char operator++(int) noexcept;
     constexpr utf8_char& operator--() noexcept;
@@ -549,38 +544,6 @@ constexpr std::uint32_t as_scalar() const noexcept;
 ```
 
 Returns the Unicode scalar value represented by this character.
-
-#### `as_view`
-
-```cpp
-constexpr std::u8string_view as_view() const noexcept;
-```
-
-Returns a `std::u8string_view` over the encoded UTF-8 bytes.
-
-> [!WARNING]
-> The returned view borrows from the `utf8_char` object itself.
-> It must not outlive that character object.
-
-#### `as_utf8_view`
-
-```cpp
-constexpr utf8_string_view as_utf8_view() const noexcept;
-```
-
-Returns a validated string view of this single character.
-
-> [!WARNING]
-> This is also a borrowing view into the `utf8_char` object itself.
-> It is safe for named objects, but must not be kept after the character object is destroyed.
-
-#### `operator std::u8string_view`
-
-```cpp
-constexpr operator std::u8string_view() const noexcept;
-```
-
-Implicit conversion to `std::u8string_view`.
 
 #### `code_unit_count`
 
@@ -776,13 +739,12 @@ Compared to `utf8_char`, the main differences are:
 - both `utf8_char` and `utf16_char` expose `code_unit_count()`
 - the difference is the encoded code-unit type: UTF-8 bytes versus UTF-16 code units
 - construction is from UTF-16 code units rather than UTF-8 bytes
-- `utf16_char` exposes `as_view()` as a `std::u16string_view`, while `utf8_char` exposes both `as_view()` and `as_utf8_view()`
+- both character types expose scalar conversion, code-unit counting, encoding, classification, and case helpers
 
 It supports:
 
 - checked and unchecked scalar construction
 - checked and unchecked UTF-16 code-unit construction
-- `std::u16string_view` interop via `as_view()` and implicit conversion
 - conversion back to scalar value
 - UTF-8 and UTF-16 emission
 - direct increment and decrement across Unicode scalar values
@@ -812,9 +774,6 @@ struct utf16_char
         const CharT* code_units, std::size_t size) noexcept;
 
     constexpr std::uint32_t as_scalar() const noexcept;
-    constexpr std::u16string_view as_view() const noexcept;
-    constexpr operator std::u16string_view() const noexcept;
-
     constexpr utf16_char& operator++() noexcept;
     constexpr utf16_char operator++(int) noexcept;
     constexpr utf16_char& operator--() noexcept;
@@ -908,18 +867,6 @@ constexpr std::uint32_t as_scalar() const noexcept;
 ```
 
 Returns the Unicode scalar value represented by this character.
-
-#### `as_view`
-
-```cpp
-constexpr std::u16string_view as_view() const noexcept;
-```
-
-Returns a `std::u16string_view` over the stored UTF-16 code units.
-
-> [!WARNING]
-> The returned view borrows from the `utf16_char` object itself.
-> It must not outlive that character object.
 
 #### `code_unit_count`
 
@@ -1159,6 +1106,18 @@ public:
         split_once_at(size_type delim) const noexcept;
     constexpr std::pair<utf8_string_view, utf8_string_view>
         split_once_at_unchecked(size_type delim) const noexcept;
+    template<class Allocator = std::allocator<char8_t>>
+    constexpr basic_utf8_string<Allocator>
+        to_ascii_lowercase(const Allocator& alloc = Allocator()) const;
+    template<class Allocator = std::allocator<char8_t>>
+    constexpr basic_utf8_string<Allocator>
+        to_ascii_uppercase(const Allocator& alloc = Allocator()) const;
+    template<class Allocator = std::allocator<char8_t>>
+    constexpr basic_utf8_string<Allocator>
+        to_lowercase(const Allocator& alloc = Allocator()) const;
+    template<class Allocator = std::allocator<char8_t>>
+    constexpr basic_utf8_string<Allocator>
+        to_uppercase(const Allocator& alloc = Allocator()) const;
     constexpr utf8_string replace_all(utf8_char from, utf8_char to) const;
     constexpr utf8_string replace_all(utf8_char from, utf8_string_view to) const;
     constexpr utf8_string replace_all(utf8_string_view from, utf8_char to) const;
@@ -1305,24 +1264,6 @@ Complexity:
 - Constant to construct the view
 - Linear to iterate the entire view
 - `find_grapheme(...)`, `rfind_grapheme(...)`, and `contains_grapheme(...)`: linear in the number of grapheme clusters examined
-
-#### `reversed_graphemes`
-
-```cpp
-constexpr auto reversed_graphemes() const;
-```
-
-Returns a reverse grapheme view over the contained text.
-
-> [!WARNING]
-> The returned range borrows from the underlying UTF-8 storage.
-> Do not keep it after the source storage is destroyed or after an owning source string is mutated.
-
-Complexity:
-
-- Linear to construct the view
-- Constant-time `begin()`
-- Linear to iterate the entire view
 
 #### `size`
 
@@ -2325,11 +2266,15 @@ constexpr bool starts_with(char ch) const noexcept;
 constexpr bool starts_with(char8_t ch) const noexcept;
 constexpr bool starts_with(utf8_char ch) const noexcept;
 constexpr bool starts_with(utf8_string_view sv) const noexcept;
+template<class Pred>
+constexpr bool starts_with(Pred pred) const noexcept(/* predicate-dependent */);
 ```
 
 Returns `true` if the view begins with the supplied prefix.
 
 For the `char8_t` overload, the comparison is against a single UTF-8 code unit. In practice this is mainly useful for ASCII prefixes; use `utf8_char` or `utf8_string_view` for general Unicode prefixes.
+
+The predicate overload decodes the first UTF-8 character and applies `pred` to that character.
 
 Preconditions:
 
@@ -2337,7 +2282,55 @@ Preconditions:
 
 Complexity:
 
-- Constant for `char`, `char8_t`, and `utf8_char`
+- Constant for `char`, `char8_t`, `utf8_char`, and predicate overloads
+- Linear in `sv.size()` for `utf8_string_view`
+
+Examples:
+
+```cpp
+constexpr auto text = u8"Äbc"_utf8_sv;
+
+static_assert(text.starts_with(u8"Ä"_u8c));
+static_assert(text.starts_with([](unicode_ranges::utf8_char ch) {
+    return ch == u8"Ä"_u8c;
+}));
+static_assert(!text.starts_with([](unicode_ranges::utf8_char ch) {
+    return ch == u8"b"_u8c;
+}));
+```
+
+#### `to_ascii_lowercase`, `to_ascii_uppercase`, `to_lowercase`, `to_uppercase`
+
+```cpp
+template<class Allocator = std::allocator<char8_t>>
+constexpr basic_utf8_string<Allocator>
+    to_ascii_lowercase(const Allocator& alloc = Allocator()) const;
+template<class Allocator = std::allocator<char8_t>>
+constexpr basic_utf8_string<Allocator>
+    to_ascii_uppercase(const Allocator& alloc = Allocator()) const;
+template<class Allocator = std::allocator<char8_t>>
+constexpr basic_utf8_string<Allocator>
+    to_lowercase(const Allocator& alloc = Allocator()) const;
+template<class Allocator = std::allocator<char8_t>>
+constexpr basic_utf8_string<Allocator>
+    to_uppercase(const Allocator& alloc = Allocator()) const;
+```
+
+Return an owning UTF-8 string with Unicode case conversion applied.
+
+- `to_ascii_lowercase` and `to_ascii_uppercase` affect only ASCII letters.
+- `to_lowercase` and `to_uppercase` use Unicode case mappings and may expand the output.
+- Non-ASCII characters are left untouched by the ASCII-only methods.
+- The full Unicode methods are locale-independent.
+
+Examples:
+
+```cpp
+assert(u8"AbC-éß"_utf8_sv.to_ascii_lowercase() == u8"abc-éß"_utf8_s);
+assert(u8"aBc-éß"_utf8_sv.to_ascii_uppercase() == u8"ABC-éß"_utf8_s);
+assert(u8"ÄΩİ"_utf8_sv.to_lowercase() == u8"äωi̇"_utf8_s);
+assert(u8"äßω"_utf8_sv.to_uppercase() == u8"ÄSSΩ"_utf8_s);
+```
 - Linear in `sv.size()` for `utf8_string_view`
 
 #### `ends_with`
@@ -2572,9 +2565,23 @@ public:
     constexpr bool starts_with(char16_t ch) const noexcept;
     constexpr bool starts_with(utf16_char ch) const noexcept;
     constexpr bool starts_with(utf16_string_view sv) const noexcept;
+    template<class Pred>
+    constexpr bool starts_with(Pred pred) const noexcept(/* predicate-dependent */);
     constexpr bool ends_with(char16_t ch) const noexcept;
     constexpr bool ends_with(utf16_char ch) const noexcept;
     constexpr bool ends_with(utf16_string_view sv) const noexcept;
+    template<class Allocator = std::allocator<char16_t>>
+    constexpr basic_utf16_string<Allocator>
+        to_ascii_lowercase(const Allocator& alloc = Allocator()) const;
+    template<class Allocator = std::allocator<char16_t>>
+    constexpr basic_utf16_string<Allocator>
+        to_ascii_uppercase(const Allocator& alloc = Allocator()) const;
+    template<class Allocator = std::allocator<char16_t>>
+    constexpr basic_utf16_string<Allocator>
+        to_lowercase(const Allocator& alloc = Allocator()) const;
+    template<class Allocator = std::allocator<char16_t>>
+    constexpr basic_utf16_string<Allocator>
+        to_uppercase(const Allocator& alloc = Allocator()) const;
     constexpr size_type ceil_char_boundary(size_type pos) const noexcept;
     constexpr size_type floor_char_boundary(size_type pos) const noexcept;
     constexpr size_type ceil_grapheme_boundary(size_type pos) const noexcept;
@@ -2883,7 +2890,7 @@ Complexity:
 Complexity:
 
 - `chars()`, `reversed_chars()`, `char_indices()`, and `grapheme_indices()`: constant to construct, linear to iterate
-- `graphemes()` and `reversed_graphemes()`: constant to construct, linear to iterate the full view
+- `graphemes()`: constant to construct, linear to iterate the full view
 - `contains(...)`, `find(...)`, and `rfind(...)`: linear in `size()`
 - `find_grapheme(...)`, `rfind_grapheme(...)`, and `contains_grapheme(...)`: linear in the number of grapheme clusters examined
 - `find_first_of(...)`, `find_first_not_of(...)`, `find_last_of(...)`, and `find_last_not_of(...)`: linear in `size()` for `char16_t` / `utf16_char`, and linear in `size() * sv.char_count()` for `utf16_string_view` in the worst case
@@ -3043,7 +3050,7 @@ The owning UTF-16 string supports the same mutation family as `utf8_string`:
 All positions and lengths are UTF-16 code-unit indices. Mutating operations throw `std::out_of_range` when asked to split a surrogate pair, while query-style operations such as `split_once()`, `rsplit_once()`, `split_once_at()`, `char_at()`, `substr()`, and `grapheme_substr()` report failure with `std::optional`.
 
 > [!WARNING]
-> Like `utf8_string`, borrowed results from `as_view()`, `chars()`, `graphemes()`, `reversed_graphemes()`, and related range helpers are tied to the string's internal storage and should not be kept across mutation.
+> Like `utf8_string`, borrowed results from `as_view()`, `chars()`, `graphemes()`, and related range helpers are tied to the string's internal storage and should not be kept across mutation.
 
 > [!IMPORTANT]
 > The same self-referential insertion guarantee applies here as on `utf8_string`, and it is covered by the test suite.
@@ -3053,6 +3060,7 @@ Complexity:
 
 - `append`, `append_range`, `assign`, `assign_range`, and `operator+=`: linear in the appended or assigned text size
 - `push_back`: amortized constant
+- `reverse(...)`: linear in the reversed substring size
 - `insert`, `erase`, `replace_inplace`, `replace_with_range_inplace`, `replace_all`, and `replace_n`: linear in `size() + replacement_size`
 - `operator+`: linear in `lhs.size() + rhs.size()`
 - `to_utf8()`: linear in `size()`
@@ -3124,6 +3132,47 @@ Throws:
 
 Complexity: linear in `size()`.
 
+#### Reverse
+
+```cpp
+constexpr basic_utf16_string& reverse() noexcept;
+constexpr basic_utf16_string& reverse(std::size_t pos, std::size_t count = npos);
+```
+
+Reverses UTF-16 characters in place.
+
+Behavior:
+
+- `reverse()` reverses the whole string and is `noexcept`
+- `reverse(pos, count)` reverses the substring `[pos, pos + count)`
+- `count == npos` reverses from `pos` to the end of the string
+- reversal is character-aware, so surrogate pairs stay intact
+
+Requirements:
+
+- `pos <= size()`
+- `count == npos` or `count <= size() - pos`
+- `pos` must be a UTF-16 character boundary
+- `pos + resolved_count` must also be a UTF-16 character boundary
+
+Throws:
+
+- `std::out_of_range` if `pos` is greater than `size()`
+- `std::out_of_range` if an explicit `count` extends past the end of the string
+- `std::out_of_range` if the reversed range does not align to UTF-16 character boundaries
+
+Complexity: linear in the reversed substring size.
+
+```cpp
+auto s = u"Aé😀"_utf16_s;
+s.reverse();
+assert(s == u"😀éA"_utf16_sv);
+
+auto part = u"AéB😀C"_utf16_s;
+part.reverse(1, 4);
+assert(part == u"A😀BéC"_utf16_sv);
+```
+
 #### Replace In Place
 
 ```cpp
@@ -3181,6 +3230,14 @@ constexpr basic_utf16_string replace_n(std::size_t count, utf16_char from, utf16
 constexpr basic_utf16_string replace_n(std::size_t count, utf16_char from, utf16_string_view to) &&;
 constexpr basic_utf16_string replace_n(std::size_t count, utf16_string_view from, utf16_char to) &&;
 constexpr basic_utf16_string replace_n(std::size_t count, utf16_string_view from, utf16_string_view to) &&;
+constexpr basic_utf16_string to_ascii_lowercase() const&;
+constexpr basic_utf16_string to_ascii_lowercase() &&;
+constexpr basic_utf16_string to_ascii_uppercase() const&;
+constexpr basic_utf16_string to_ascii_uppercase() &&;
+constexpr basic_utf16_string to_lowercase() const&;
+constexpr basic_utf16_string to_lowercase() &&;
+constexpr basic_utf16_string to_uppercase() const&;
+constexpr basic_utf16_string to_uppercase() &&;
 ```
 
 Returns a new owning string after replacing non-overlapping matches of `from`.
@@ -3189,7 +3246,7 @@ Returns a new owning string after replacing non-overlapping matches of `from`.
 - `replace_n(...)` replaces at most `count` non-overlapping matches
 - empty `from` is a no-op
 - `const&` overloads leave the source string unchanged
-- `&&` overloads mutate and return the current owning string so its buffer can be reused when capacity permits
+- `&&` overloads return the current owning string and may reuse storage when profitable
 
 Complexity: linear in `size() + replacement_size * replaced_count`.
 
@@ -3294,6 +3351,9 @@ public:
     constexpr Allocator get_allocator() const noexcept;
     constexpr std::size_t size() const;
     constexpr std::optional<utf8_char> pop_back();
+    constexpr basic_utf8_string& reverse() noexcept;
+    constexpr basic_utf8_string& reverse(std::size_t pos,
+                                         std::size_t count = npos);
     constexpr basic_utf8_string& insert(std::size_t index, utf8_string_view sv);
     constexpr basic_utf8_string& insert(std::size_t index, utf8_char ch);
     constexpr basic_utf8_string& insert(std::size_t index, std::size_t count,
@@ -3333,6 +3393,14 @@ public:
     constexpr basic_utf8_string replace_n(std::size_t count, utf8_char from, utf8_string_view to) &&;
     constexpr basic_utf8_string replace_n(std::size_t count, utf8_string_view from, utf8_char to) &&;
     constexpr basic_utf8_string replace_n(std::size_t count, utf8_string_view from, utf8_string_view to) &&;
+    constexpr basic_utf8_string to_ascii_lowercase() const&;
+    constexpr basic_utf8_string to_ascii_lowercase() &&;
+    constexpr basic_utf8_string to_ascii_uppercase() const&;
+    constexpr basic_utf8_string to_ascii_uppercase() &&;
+    constexpr basic_utf8_string to_lowercase() const&;
+    constexpr basic_utf8_string to_lowercase() &&;
+    constexpr basic_utf8_string to_uppercase() const&;
+    constexpr basic_utf8_string to_uppercase() &&;
     constexpr void reserve(std::size_t new_cap);
     constexpr auto base() const& noexcept;
     constexpr auto base() && noexcept;
@@ -3423,6 +3491,7 @@ Complexity:
 - `assign_range`, iterator-based `assign`, and `assign(std::initializer_list<utf8_char>)`: linear in the replacement size
 - `append(std::size_t count, utf8_char)` and `assign(std::size_t count, utf8_char)`: linear in `count`
 - `append(utf8_string_view)`, `assign(utf8_string_view)`, and `operator+=` on text/string arguments: linear in the appended or assigned text size
+- `reverse(...)`: linear in the reversed substring size
 - `replace_inplace(...)`, `replace_with_range_inplace(...)`, `replace_all(...)`, and `replace_n(...)`: linear in `size() + replacement_size`
 - `assign(utf8_char)` and `operator+=` on single-character arguments: amortized constant
 - `push_back(utf8_char)`: amortized constant
@@ -3493,6 +3562,47 @@ Throws:
 - `std::out_of_range` if the erased range does not align to UTF-8 character boundaries
 
 Complexity: linear in `size()`.
+
+#### Reverse
+
+```cpp
+constexpr basic_utf8_string& reverse() noexcept;
+constexpr basic_utf8_string& reverse(std::size_t pos, std::size_t count = npos);
+```
+
+Reverses UTF-8 characters in place.
+
+Behavior:
+
+- `reverse()` reverses the whole string and is `noexcept`
+- `reverse(pos, count)` reverses the substring `[pos, pos + count)`
+- `count == npos` reverses from `pos` to the end of the string
+- reversal is character-aware, so multibyte UTF-8 characters stay intact
+
+Requirements:
+
+- `pos <= size()`
+- `count == npos` or `count <= size() - pos`
+- `pos` must be a UTF-8 character boundary
+- `pos + resolved_count` must also be a UTF-8 character boundary
+
+Throws:
+
+- `std::out_of_range` if `pos` is greater than `size()`
+- `std::out_of_range` if an explicit `count` extends past the end of the string
+- `std::out_of_range` if the reversed range does not align to UTF-8 character boundaries
+
+Complexity: linear in the reversed substring size.
+
+```cpp
+auto s = u8"Aé😀"_utf8_s;
+s.reverse();
+assert(s == u8"😀éA"_utf8_sv);
+
+auto part = u8"AéB😀C"_utf8_s;
+part.reverse(1, 7);
+assert(part == u8"A😀BéC"_utf8_sv);
+```
 
 #### Replace In Place
 
@@ -3587,7 +3697,7 @@ Behavior:
 - predicate overloads replace each matching character independently
 - empty `utf8_string_view` search patterns are a no-op
 - `const&` overloads leave the source string unchanged
-- `&&` overloads return the current owning string after replacing in place, so its buffer can be reused when capacity permits
+- `&&` overloads return the current owning string and may reuse storage when profitable
 - allocator-taking overloads construct the result with the supplied allocator
 
 Complexity: linear in `size() + replacement_size * replaced_count`.
@@ -3596,17 +3706,17 @@ Complexity: linear in `size() + replacement_size * replaced_count`.
 using namespace unicode_ranges::literals;
 
 const auto view = u8"bananas"_utf8_sv;
-assert(view.replace_all(u8"na"_utf8_sv, u8"NO"_utf8_sv) == unicode_ranges::utf8_string{ u8"baNONOs"_utf8_sv });
-assert(view.replace_n(1, u8"na"_utf8_sv, u8"NO"_utf8_sv) == unicode_ranges::utf8_string{ u8"baNOnas"_utf8_sv });
+assert(view.replace_all(u8"na"_utf8_sv, u8"NO"_utf8_sv) == u8"baNONOs"_utf8_s);
+assert(view.replace_n(1, u8"na"_utf8_sv, u8"NO"_utf8_sv) == u8"baNOnas"_utf8_s);
 
 assert(
     u8"123-456"_utf8_sv.replace_all(
         [](unicode_ranges::utf8_char ch) { return ch >= u8"0"_u8c && ch <= u8"9"_u8c; },
         u8"x"_u8c)
-    == unicode_ranges::utf8_string{ u8"xxx-xxx"_utf8_sv });
+    == u8"xxx-xxx"_utf8_s);
 
-unicode_ranges::utf8_string owned{ u8"banana"_utf8_sv };
-assert(std::move(owned).replace_all(u8"na"_utf8_sv, u8"NO"_utf8_sv) == unicode_ranges::utf8_string{ u8"baNONO"_utf8_sv });
+auto owned = u8"banana"_utf8_s;
+assert(std::move(owned).replace_all(u8"na"_utf8_sv, u8"NO"_utf8_sv) == u8"baNONO"_utf8_s);
 
 std::pmr::monotonic_buffer_resource memory;
 auto pmr_result = view.replace_all(

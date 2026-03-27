@@ -57,6 +57,11 @@ struct PropertyRecord {
     fields: Vec<String>,
 }
 
+struct CaseMappingRecord {
+    source: u32,
+    mapped: Vec<u32>,
+}
+
 fn collect_ranges<F: Fn(char) -> bool>(pred: F) -> Vec<Range> {
     let mut ranges = Vec::new();
     let mut start: Option<u32> = None;
@@ -97,6 +102,29 @@ fn collect_ranges<F: Fn(char) -> bool>(pred: F) -> Vec<Range> {
     ranges
 }
 
+fn collect_case_mappings<F: Fn(char) -> Vec<u32>>(map: F) -> Vec<CaseMappingRecord> {
+    let mut mappings = Vec::new();
+
+    for scalar in 0u32..=0x10FFFF {
+        if (0xD800..=0xDFFF).contains(&scalar) {
+            continue;
+        }
+
+        let ch = char::from_u32(scalar).unwrap();
+        let mapped = map(ch);
+        if mapped.len() == 1 && mapped[0] == scalar {
+            continue;
+        }
+
+        mappings.push(CaseMappingRecord {
+            source: scalar,
+            mapped,
+        });
+    }
+
+    mappings
+}
+
 fn emit_ranges(name: &str, ranges: &[Range]) {
     println!(
         "inline constexpr std::array<unicode_range, {}> {}{{{{",
@@ -107,6 +135,92 @@ fn emit_ranges(name: &str, ranges: &[Range]) {
         println!("    {{ 0x{first:04X}u, 0x{last:04X}u }},");
     }
     println!("}}}};");
+    println!();
+}
+
+fn case_mapping_max_length(mappings: &[CaseMappingRecord]) -> usize {
+    mappings
+        .iter()
+        .map(|mapping| mapping.mapped.len())
+        .max()
+        .unwrap_or(1)
+}
+
+fn emit_case_mapping_support(max_length: usize) {
+    println!(
+        "inline constexpr std::size_t unicode_case_mapping_max_length = {max_length};"
+    );
+    println!();
+    println!("struct unicode_case_mapping");
+    println!("{{");
+    println!("    std::uint32_t source;");
+    println!("    std::uint8_t count;");
+    println!(
+        "    std::array<std::uint32_t, unicode_case_mapping_max_length> mapped;"
+    );
+    println!("}};");
+    println!();
+    println!("template <std::size_t N>");
+    println!(
+        "constexpr const unicode_case_mapping* find_case_mapping(std::uint32_t scalar, const std::array<unicode_case_mapping, N>& mappings) noexcept"
+    );
+    println!("{{");
+    println!("    std::size_t left = 0;");
+    println!("    std::size_t right = N;");
+    println!("    while (left < right)");
+    println!("    {{");
+    println!("        const std::size_t mid = left + (right - left) / 2;");
+    println!("        const unicode_case_mapping& mapping = mappings[mid];");
+    println!("        if (scalar < mapping.source)");
+    println!("        {{");
+    println!("            right = mid;");
+    println!("        }}");
+    println!("        else if (scalar > mapping.source)");
+    println!("        {{");
+    println!("            left = mid + 1;");
+    println!("        }}");
+    println!("        else");
+    println!("        {{");
+    println!("            return &mapping;");
+    println!("        }}");
+    println!("    }}");
+    println!("    return nullptr;");
+    println!("}}");
+    println!();
+}
+
+fn emit_case_mappings(name: &str, mappings: &[CaseMappingRecord], max_length: usize) {
+    println!(
+        "inline constexpr std::array<unicode_case_mapping, {}> {}{{{{",
+        mappings.len(),
+        name
+    );
+    for mapping in mappings {
+        print!(
+            "    {{ 0x{:04X}u, {}u, {{ ",
+            mapping.source,
+            mapping.mapped.len()
+        );
+        for index in 0..max_length {
+            let scalar = mapping.mapped.get(index).copied().unwrap_or(0);
+            if index != 0 {
+                print!(", ");
+            }
+            print!("0x{scalar:04X}u");
+        }
+        println!(" }} }},");
+    }
+    println!("}}}};");
+    println!();
+}
+
+fn emit_case_mapping_lookup(fn_name: &str, mappings_name: &str) {
+    println!(
+        "constexpr const unicode_case_mapping* {fn_name}(std::uint32_t scalar) noexcept"
+    );
+    println!("{{");
+    println!("    return find_case_mapping(scalar, {mappings_name});");
+    println!("}}");
     println!();
 }
 
@@ -321,7 +435,12 @@ fn main() -> io::Result<()> {
     )?;
     let indic_conjunct_break_ranges =
         collect_indic_conjunct_break_ranges(&data_root.join("ucd").join("DerivedCoreProperties.txt"))?;
-
+    let lowercase_mappings =
+        collect_case_mappings(|ch| ch.to_lowercase().map(|mapped| mapped as u32).collect());
+    let uppercase_mappings =
+        collect_case_mappings(|ch| ch.to_uppercase().map(|mapped| mapped as u32).collect());
+    let unicode_case_mapping_max_length = case_mapping_max_length(&lowercase_mappings)
+        .max(case_mapping_max_length(&uppercase_mappings));
     println!("#ifndef UTF8_RANGES_UNICODE_TABLES_HPP");
     println!("#define UTF8_RANGES_UNICODE_TABLES_HPP");
     println!();
@@ -340,6 +459,7 @@ fn main() -> io::Result<()> {
         UNICODE_VERSION.0, UNICODE_VERSION.1, UNICODE_VERSION.2
     );
     println!();
+    emit_case_mapping_support(unicode_case_mapping_max_length);
     println!("template <std::size_t N>");
     println!("constexpr bool in_ranges(std::uint32_t scalar, const std::array<unicode_range, N>& ranges) noexcept");
     println!("{{");
@@ -398,6 +518,16 @@ fn main() -> io::Result<()> {
     emit_ranges("control_ranges", &collect_ranges(|ch| ch.is_control()));
     emit_ranges("numeric_ranges", &collect_ranges(|ch| ch.is_numeric()));
     emit_ranges("digit_ranges", &collect_ranges(|ch| ch.is_digit(10)));
+    emit_case_mappings(
+        "lowercase_mappings",
+        &lowercase_mappings,
+        unicode_case_mapping_max_length,
+    );
+    emit_case_mappings(
+        "uppercase_mappings",
+        &uppercase_mappings,
+        unicode_case_mapping_max_length,
+    );
 
     for &(name, ranges_name, _) in GRAPHEME_BREAK_VALUES {
         let ranges = grapheme_break_ranges
@@ -425,6 +555,8 @@ fn main() -> io::Result<()> {
     emit_bool_lookup("is_control", "control_ranges");
     emit_bool_lookup("is_numeric", "numeric_ranges");
     emit_bool_lookup("is_digit", "digit_ranges");
+    emit_case_mapping_lookup("lowercase_mapping", "lowercase_mappings");
+    emit_case_mapping_lookup("uppercase_mapping", "uppercase_mappings");
     emit_property_lookup(
         "grapheme_cluster_break",
         "grapheme_cluster_break_property",

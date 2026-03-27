@@ -75,12 +75,6 @@ inline std::ostream& operator<<(std::ostream& os, utf8_string_view value)
 }
 
 [[nodiscard]]
-inline constexpr utf8_string_view utf8_char::as_utf8_view() const noexcept
-{
-	return utf8_string_view::from_bytes_unchecked(as_view());
-}
-
-[[nodiscard]]
 inline constexpr utf8_string_view details::utf8_string_view_from_bytes_unchecked(std::u8string_view bytes) noexcept
 {
 	return utf8_string_view::from_bytes_unchecked(bytes);

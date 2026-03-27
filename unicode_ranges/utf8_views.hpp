@@ -98,6 +98,11 @@ namespace views
 			return std::default_sentinel;
 		}
 
+		constexpr std::size_t reserve_hint() const noexcept
+		{
+			return base_.size();
+		}
+
 	private:
 		constexpr explicit utf8_view(std::u8string_view base) noexcept
 			: base_(base)
@@ -199,6 +204,11 @@ namespace views
 		constexpr std::default_sentinel_t end() const noexcept
 		{
 			return std::default_sentinel;
+		}
+
+		constexpr std::size_t reserve_hint() const noexcept
+		{
+			return base_.size();
 		}
 
 	private:
@@ -324,6 +334,11 @@ namespace views
 		constexpr std::default_sentinel_t end() const noexcept
 		{
 			return std::default_sentinel;
+		}
+
+		constexpr std::size_t reserve_hint() const noexcept
+		{
+			return base_.size();
 		}
 
 	private:

@@ -7,6 +7,14 @@
 namespace unicode_ranges
 {
 
+struct utf8_char;
+
+namespace details
+{
+	[[nodiscard]]
+	constexpr std::u8string_view utf8_char_view(const utf8_char& ch) noexcept;
+}
+
 inline constexpr std::tuple<std::size_t, std::size_t, std::size_t> unicode_version = details::unicode::unicode_version;
 
 struct utf8_char
@@ -48,24 +56,10 @@ public:
 	[[nodiscard]]
 	constexpr std::uint32_t as_scalar() const noexcept
 	{
-		return details::decode_valid_utf8_char(std::u8string_view{ bytes_.data(), code_unit_count() });
-	}
-
-	[[nodiscard]]
-	constexpr operator std::u8string_view() const noexcept
-	{
-		return as_view();
-	}
-
-	[[nodiscard]]
-	constexpr std::u8string_view as_view() const noexcept
-	{
-		return { bytes_.data(), code_unit_count() };
+		return details::decode_valid_utf8_char(bytes_.data(), code_unit_count());
 	}
 
 	constexpr operator utf16_char() const noexcept;
-
-	constexpr utf8_string_view as_utf8_view() const noexcept;
 
 	template <typename Allocator = std::allocator<char8_t>>
 	constexpr basic_utf8_string<Allocator> to_utf8_owned(const Allocator& alloc = Allocator()) const;
@@ -645,7 +639,7 @@ public:
 		&& std::output_iterator<OutIt, CharT>)
 	constexpr std::size_t encode_utf8(OutIt out) const noexcept
 	{
-		const auto text = static_cast<std::basic_string_view<char8_t>>(*this);
+		const auto text = as_view();
 		std::ranges::copy_n(text.data(), text.size(), out);
 		return text.size();
 	}
@@ -685,7 +679,7 @@ public:
 
 	friend std::ostream& operator<<(std::ostream& os, const utf8_char& ch)
 	{
-		const auto text = static_cast<std::basic_string_view<char8_t>>(ch);
+		const auto text = details::utf8_char_view(ch);
 		os.write(reinterpret_cast<const char*>(text.data()), static_cast<std::streamsize>(text.size()));
 		return os;
 	}
@@ -693,6 +687,14 @@ public:
 private:
 	template <typename CharT>
 	friend class views::lossy_utf8_view;
+
+	friend constexpr std::u8string_view details::utf8_char_view(const utf8_char& ch) noexcept;
+
+	[[nodiscard]]
+	constexpr std::u8string_view as_view() const noexcept
+	{
+		return { bytes_.data(), code_unit_count() };
+	}
 
 	static constexpr std::uint8_t invalid_sentinel_byte = 0xFFu;
 
@@ -791,6 +793,15 @@ private:
 static_assert(std::is_trivially_copyable_v<utf8_char>);
 inline constexpr utf8_char utf8_char::replacement_character = utf8_char::from_scalar_unchecked(details::encoding_constants::replacement_character_scalar);
 inline constexpr utf8_char utf8_char::null_terminator = utf8_char{};
+
+namespace details
+{
+	[[nodiscard]]
+	inline constexpr std::u8string_view utf8_char_view(const utf8_char& ch) noexcept
+	{
+		return ch.as_view();
+	}
+}
 
 namespace literals
 {

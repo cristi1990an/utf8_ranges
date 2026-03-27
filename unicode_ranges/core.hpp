@@ -9,6 +9,7 @@
 #include <compare>
 #include <concepts>
 #include <cstdint>
+#include <cstring>
 #include <expected>
 #include <format>
 #include <functional>
@@ -25,6 +26,20 @@
 #include <utility>
 
 #include <uchar.h>
+
+#if defined(__has_include)
+#if __has_include(<emmintrin.h>) && (defined(_M_X64) || defined(_M_AMD64) || defined(__x86_64__) || defined(__SSE2__) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2))
+#define UTF8_RANGES_HAS_SSE2_INTRINSICS 1
+#endif
+#endif
+
+#ifndef UTF8_RANGES_HAS_SSE2_INTRINSICS
+#define UTF8_RANGES_HAS_SSE2_INTRINSICS 0
+#endif
+
+#if UTF8_RANGES_HAS_SSE2_INTRINSICS
+#include <emmintrin.h>
+#endif
 
 #include "unicode_tables.hpp"
 
@@ -103,9 +118,6 @@ namespace views
 
 	template <typename CharT>
 	class grapheme_cluster_view;
-
-	template <typename CharT>
-	class reversed_grapheme_cluster_view;
 
 	class utf16_view;
 
@@ -199,6 +211,622 @@ namespace details
 		inline constexpr std::uint8_t utf8_ed_second_byte_max = 0x9Fu;
 		inline constexpr std::uint8_t utf8_f0_second_byte_min = 0x90u;
 		inline constexpr std::uint8_t utf8_f4_second_byte_max = 0x8Fu;
+	}
+
+	template <typename CharT>
+	requires (sizeof(CharT) == 1)
+	inline constexpr std::size_t ascii_prefix_length_scalar(std::basic_string_view<CharT> value) noexcept
+	{
+		std::size_t index = 0;
+		while (index < value.size()
+			&& static_cast<std::uint8_t>(value[index]) <= encoding_constants::ascii_scalar_max)
+		{
+			++index;
+		}
+
+		return index;
+	}
+
+	template <typename CharT>
+	requires (sizeof(CharT) == 2)
+	inline constexpr std::size_t ascii_prefix_length_scalar(std::basic_string_view<CharT> value) noexcept
+	{
+		std::size_t index = 0;
+		while (index < value.size()
+			&& static_cast<std::uint16_t>(value[index]) <= encoding_constants::ascii_scalar_max)
+		{
+			++index;
+		}
+
+		return index;
+	}
+
+	template <typename CharT>
+	requires (sizeof(CharT) == 4)
+	inline constexpr std::size_t ascii_prefix_length_scalar(std::basic_string_view<CharT> value) noexcept
+	{
+		std::size_t index = 0;
+		while (index < value.size()
+			&& static_cast<std::uint32_t>(value[index]) <= encoding_constants::ascii_scalar_max)
+		{
+			++index;
+		}
+
+		return index;
+	}
+
+	template <typename CharT>
+	requires (sizeof(CharT) == 1)
+	inline std::size_t ascii_prefix_length_runtime(std::basic_string_view<CharT> value) noexcept
+	{
+#if UTF8_RANGES_HAS_SSE2_INTRINSICS
+		const auto* data = reinterpret_cast<const std::uint8_t*>(value.data());
+		std::size_t index = 0;
+		while (index + 16 <= value.size())
+		{
+			const auto block = _mm_loadu_si128(reinterpret_cast<const __m128i*>(data + index));
+			if (_mm_movemask_epi8(block) != 0)
+			{
+				for (std::size_t lane = 0; lane != 16; ++lane)
+				{
+					if (data[index + lane] > encoding_constants::ascii_scalar_max)
+					{
+						return index + lane;
+					}
+				}
+			}
+
+			index += 16;
+		}
+
+		while (index < value.size() && data[index] <= encoding_constants::ascii_scalar_max)
+		{
+			++index;
+		}
+
+		return index;
+#else
+		return ascii_prefix_length_scalar(value);
+#endif
+	}
+
+	template <typename CharT>
+	requires (sizeof(CharT) == 2)
+	inline std::size_t ascii_prefix_length_runtime(std::basic_string_view<CharT> value) noexcept
+	{
+#if UTF8_RANGES_HAS_SSE2_INTRINSICS
+		const auto ascii_mask = _mm_set1_epi16(static_cast<short>(-128));
+		const auto zero = _mm_setzero_si128();
+		std::size_t index = 0;
+		while (index + 8 <= value.size())
+		{
+			const auto block = _mm_loadu_si128(reinterpret_cast<const __m128i*>(value.data() + index));
+			const auto high_bits = _mm_and_si128(block, ascii_mask);
+			const auto ascii_lanes = _mm_cmpeq_epi16(high_bits, zero);
+			if (_mm_movemask_epi8(ascii_lanes) != 0xFFFF)
+			{
+				for (std::size_t lane = 0; lane != 8; ++lane)
+				{
+					if (static_cast<std::uint16_t>(value[index + lane]) > encoding_constants::ascii_scalar_max)
+					{
+						return index + lane;
+					}
+				}
+			}
+
+			index += 8;
+		}
+
+		while (index < value.size()
+			&& static_cast<std::uint16_t>(value[index]) <= encoding_constants::ascii_scalar_max)
+		{
+			++index;
+		}
+
+		return index;
+#else
+		return ascii_prefix_length_scalar(value);
+#endif
+	}
+
+	template <typename CharT>
+	requires (sizeof(CharT) == 4)
+	inline std::size_t ascii_prefix_length_runtime(std::basic_string_view<CharT> value) noexcept
+	{
+		return ascii_prefix_length_scalar(value);
+	}
+
+	template <typename CharT>
+	inline constexpr std::size_t ascii_prefix_length(std::basic_string_view<CharT> value) noexcept
+	{
+		if (std::is_constant_evaluated())
+		{
+			return ascii_prefix_length_scalar(value);
+		}
+
+		return ascii_prefix_length_runtime(value);
+	}
+
+	template <typename CharT>
+	inline constexpr bool is_ascii_only(std::basic_string_view<CharT> value) noexcept
+	{
+		return ascii_prefix_length(value) == value.size();
+	}
+
+	inline constexpr bool ascii_lowercase_copy_scalar(char8_t* out, std::u8string_view bytes) noexcept
+	{
+		bool changed = false;
+		for (std::size_t index = 0; index != bytes.size(); ++index)
+		{
+			auto value = static_cast<std::uint8_t>(bytes[index]);
+			if (value >= static_cast<std::uint8_t>('A') && value <= static_cast<std::uint8_t>('Z'))
+			{
+				value = static_cast<std::uint8_t>(value + (static_cast<std::uint8_t>('a') - static_cast<std::uint8_t>('A')));
+				changed = true;
+			}
+
+			out[index] = static_cast<char8_t>(value);
+		}
+
+		return changed;
+	}
+
+	inline constexpr bool ascii_uppercase_copy_scalar(char8_t* out, std::u8string_view bytes) noexcept
+	{
+		bool changed = false;
+		for (std::size_t index = 0; index != bytes.size(); ++index)
+		{
+			auto value = static_cast<std::uint8_t>(bytes[index]);
+			if (value >= static_cast<std::uint8_t>('a') && value <= static_cast<std::uint8_t>('z'))
+			{
+				value = static_cast<std::uint8_t>(value - (static_cast<std::uint8_t>('a') - static_cast<std::uint8_t>('A')));
+				changed = true;
+			}
+
+			out[index] = static_cast<char8_t>(value);
+		}
+
+		return changed;
+	}
+
+	inline constexpr bool ascii_lowercase_copy_scalar(char16_t* out, std::u16string_view code_units) noexcept
+	{
+		bool changed = false;
+		for (std::size_t index = 0; index != code_units.size(); ++index)
+		{
+			auto value = code_units[index];
+			if (value >= u'A' && value <= u'Z')
+			{
+				value = static_cast<char16_t>(value + (u'a' - u'A'));
+				changed = true;
+			}
+
+			out[index] = value;
+		}
+
+		return changed;
+	}
+
+	inline constexpr bool ascii_uppercase_copy_scalar(char16_t* out, std::u16string_view code_units) noexcept
+	{
+		bool changed = false;
+		for (std::size_t index = 0; index != code_units.size(); ++index)
+		{
+			auto value = code_units[index];
+			if (value >= u'a' && value <= u'z')
+			{
+				value = static_cast<char16_t>(value - (u'a' - u'A'));
+				changed = true;
+			}
+
+			out[index] = value;
+		}
+
+		return changed;
+	}
+
+	inline bool ascii_lowercase_copy_runtime(char8_t* out, std::u8string_view bytes) noexcept
+	{
+#if UTF8_RANGES_HAS_SSE2_INTRINSICS
+		const auto* data = reinterpret_cast<const char*>(bytes.data());
+		auto* dest = reinterpret_cast<char*>(out);
+		const auto upper_min = _mm_set1_epi8('A' - 1);
+		const auto upper_max = _mm_set1_epi8('Z' + 1);
+		const auto delta = _mm_set1_epi8(static_cast<char>('a' - 'A'));
+		bool changed = false;
+		std::size_t index = 0;
+		while (index + 16 <= bytes.size())
+		{
+			const auto block = _mm_loadu_si128(reinterpret_cast<const __m128i*>(data + index));
+			const auto is_after_min = _mm_cmpgt_epi8(block, upper_min);
+			const auto is_before_max = _mm_cmplt_epi8(block, upper_max);
+			const auto upper = _mm_and_si128(is_after_min, is_before_max);
+			changed = changed || (_mm_movemask_epi8(upper) != 0);
+			const auto add = _mm_and_si128(upper, delta);
+			const auto mapped = _mm_add_epi8(block, add);
+			_mm_storeu_si128(reinterpret_cast<__m128i*>(dest + index), mapped);
+			index += 16;
+		}
+
+		if (index != bytes.size())
+		{
+			changed = ascii_lowercase_copy_scalar(out + index, bytes.substr(index)) || changed;
+		}
+
+		return changed;
+#else
+		return ascii_lowercase_copy_scalar(out, bytes);
+#endif
+	}
+
+	inline bool ascii_uppercase_copy_runtime(char8_t* out, std::u8string_view bytes) noexcept
+	{
+#if UTF8_RANGES_HAS_SSE2_INTRINSICS
+		const auto* data = reinterpret_cast<const char*>(bytes.data());
+		auto* dest = reinterpret_cast<char*>(out);
+		const auto lower_min = _mm_set1_epi8('a' - 1);
+		const auto lower_max = _mm_set1_epi8('z' + 1);
+		const auto delta = _mm_set1_epi8(static_cast<char>('a' - 'A'));
+		bool changed = false;
+		std::size_t index = 0;
+		while (index + 16 <= bytes.size())
+		{
+			const auto block = _mm_loadu_si128(reinterpret_cast<const __m128i*>(data + index));
+			const auto is_after_min = _mm_cmpgt_epi8(block, lower_min);
+			const auto is_before_max = _mm_cmplt_epi8(block, lower_max);
+			const auto lower = _mm_and_si128(is_after_min, is_before_max);
+			changed = changed || (_mm_movemask_epi8(lower) != 0);
+			const auto sub = _mm_and_si128(lower, delta);
+			const auto mapped = _mm_sub_epi8(block, sub);
+			_mm_storeu_si128(reinterpret_cast<__m128i*>(dest + index), mapped);
+			index += 16;
+		}
+
+		if (index != bytes.size())
+		{
+			changed = ascii_uppercase_copy_scalar(out + index, bytes.substr(index)) || changed;
+		}
+
+		return changed;
+#else
+		return ascii_uppercase_copy_scalar(out, bytes);
+#endif
+	}
+
+	inline bool ascii_lowercase_copy_runtime(char16_t* out, std::u16string_view code_units) noexcept
+	{
+#if UTF8_RANGES_HAS_SSE2_INTRINSICS
+		const auto* data = reinterpret_cast<const char16_t*>(code_units.data());
+		auto* dest = reinterpret_cast<char16_t*>(out);
+		const auto upper_min = _mm_set1_epi16(u'A' - 1);
+		const auto upper_max = _mm_set1_epi16(u'Z' + 1);
+		const auto delta = _mm_set1_epi16(u'a' - u'A');
+		bool changed = false;
+		std::size_t index = 0;
+		while (index + 8 <= code_units.size())
+		{
+			const auto block = _mm_loadu_si128(reinterpret_cast<const __m128i*>(data + index));
+			const auto is_after_min = _mm_cmpgt_epi16(block, upper_min);
+			const auto is_before_max = _mm_cmplt_epi16(block, upper_max);
+			const auto upper = _mm_and_si128(is_after_min, is_before_max);
+			changed = changed || (_mm_movemask_epi8(upper) != 0);
+			const auto add = _mm_and_si128(upper, delta);
+			const auto mapped = _mm_add_epi16(block, add);
+			_mm_storeu_si128(reinterpret_cast<__m128i*>(dest + index), mapped);
+			index += 8;
+		}
+
+		if (index != code_units.size())
+		{
+			changed = ascii_lowercase_copy_scalar(out + index, code_units.substr(index)) || changed;
+		}
+
+		return changed;
+#else
+		return ascii_lowercase_copy_scalar(out, code_units);
+#endif
+	}
+
+	inline bool ascii_uppercase_copy_runtime(char16_t* out, std::u16string_view code_units) noexcept
+	{
+#if UTF8_RANGES_HAS_SSE2_INTRINSICS
+		const auto* data = reinterpret_cast<const char16_t*>(code_units.data());
+		auto* dest = reinterpret_cast<char16_t*>(out);
+		const auto lower_min = _mm_set1_epi16(u'a' - 1);
+		const auto lower_max = _mm_set1_epi16(u'z' + 1);
+		const auto delta = _mm_set1_epi16(u'a' - u'A');
+		bool changed = false;
+		std::size_t index = 0;
+		while (index + 8 <= code_units.size())
+		{
+			const auto block = _mm_loadu_si128(reinterpret_cast<const __m128i*>(data + index));
+			const auto is_after_min = _mm_cmpgt_epi16(block, lower_min);
+			const auto is_before_max = _mm_cmplt_epi16(block, lower_max);
+			const auto lower = _mm_and_si128(is_after_min, is_before_max);
+			changed = changed || (_mm_movemask_epi8(lower) != 0);
+			const auto sub = _mm_and_si128(lower, delta);
+			const auto mapped = _mm_sub_epi16(block, sub);
+			_mm_storeu_si128(reinterpret_cast<__m128i*>(dest + index), mapped);
+			index += 8;
+		}
+
+		if (index != code_units.size())
+		{
+			changed = ascii_uppercase_copy_scalar(out + index, code_units.substr(index)) || changed;
+		}
+
+		return changed;
+#else
+		return ascii_uppercase_copy_scalar(out, code_units);
+#endif
+	}
+
+	inline constexpr bool ascii_lowercase_copy(char8_t* out, std::u8string_view bytes) noexcept
+	{
+		if (std::is_constant_evaluated())
+		{
+			return ascii_lowercase_copy_scalar(out, bytes);
+		}
+
+		return ascii_lowercase_copy_runtime(out, bytes);
+	}
+
+	inline constexpr bool ascii_uppercase_copy(char8_t* out, std::u8string_view bytes) noexcept
+	{
+		if (std::is_constant_evaluated())
+		{
+			return ascii_uppercase_copy_scalar(out, bytes);
+		}
+
+		return ascii_uppercase_copy_runtime(out, bytes);
+	}
+
+	inline constexpr bool ascii_lowercase_copy(char16_t* out, std::u16string_view code_units) noexcept
+	{
+		if (std::is_constant_evaluated())
+		{
+			return ascii_lowercase_copy_scalar(out, code_units);
+		}
+
+		return ascii_lowercase_copy_runtime(out, code_units);
+	}
+
+	inline constexpr bool ascii_uppercase_copy(char16_t* out, std::u16string_view code_units) noexcept
+	{
+		if (std::is_constant_evaluated())
+		{
+			return ascii_uppercase_copy_scalar(out, code_units);
+		}
+
+		return ascii_uppercase_copy_runtime(out, code_units);
+	}
+
+	inline constexpr bool ascii_lowercase_inplace(char8_t* bytes, std::size_t size) noexcept
+	{
+		return ascii_lowercase_copy(bytes, std::u8string_view{ bytes, size });
+	}
+
+	inline constexpr bool ascii_uppercase_inplace(char8_t* bytes, std::size_t size) noexcept
+	{
+		return ascii_uppercase_copy(bytes, std::u8string_view{ bytes, size });
+	}
+
+	inline constexpr bool ascii_lowercase_inplace(char16_t* code_units, std::size_t size) noexcept
+	{
+		return ascii_lowercase_copy(code_units, std::u16string_view{ code_units, size });
+	}
+
+	inline constexpr bool ascii_uppercase_inplace(char16_t* code_units, std::size_t size) noexcept
+	{
+		return ascii_uppercase_copy(code_units, std::u16string_view{ code_units, size });
+	}
+
+	inline constexpr void copy_ascii_bytes_to_utf8_scalar(char8_t* out, std::string_view bytes) noexcept
+	{
+		for (std::size_t index = 0; index != bytes.size(); ++index)
+		{
+			out[index] = static_cast<char8_t>(static_cast<std::uint8_t>(bytes[index]));
+		}
+	}
+
+	inline void copy_ascii_bytes_to_utf8_runtime(char8_t* out, std::string_view bytes) noexcept
+	{
+#if UTF8_RANGES_HAS_SSE2_INTRINSICS
+		const auto* data = reinterpret_cast<const char*>(bytes.data());
+		auto* dest = reinterpret_cast<char*>(out);
+		std::size_t index = 0;
+		while (index + 16 <= bytes.size())
+		{
+			const auto block = _mm_loadu_si128(reinterpret_cast<const __m128i*>(data + index));
+			_mm_storeu_si128(reinterpret_cast<__m128i*>(dest + index), block);
+			index += 16;
+		}
+
+		copy_ascii_bytes_to_utf8_scalar(out + index, bytes.substr(index));
+#else
+		copy_ascii_bytes_to_utf8_scalar(out, bytes);
+#endif
+	}
+
+	inline constexpr void copy_ascii_bytes_to_utf8(char8_t* out, std::string_view bytes) noexcept
+	{
+		if (std::is_constant_evaluated())
+		{
+			copy_ascii_bytes_to_utf8_scalar(out, bytes);
+			return;
+		}
+
+		copy_ascii_bytes_to_utf8_runtime(out, bytes);
+	}
+
+	template <typename CharT>
+	requires (sizeof(CharT) == 1)
+	inline constexpr void copy_ascii_bytes_to_utf16_scalar(char16_t* out, std::basic_string_view<CharT> bytes) noexcept
+	{
+		for (std::size_t index = 0; index != bytes.size(); ++index)
+		{
+			out[index] = static_cast<char16_t>(static_cast<std::uint8_t>(bytes[index]));
+		}
+	}
+
+	template <typename CharT>
+	requires (sizeof(CharT) == 1)
+	inline void copy_ascii_bytes_to_utf16_runtime(char16_t* out, std::basic_string_view<CharT> bytes) noexcept
+	{
+#if UTF8_RANGES_HAS_SSE2_INTRINSICS
+		const auto* data = reinterpret_cast<const char*>(bytes.data());
+		const auto zero = _mm_setzero_si128();
+		std::size_t index = 0;
+		while (index + 16 <= bytes.size())
+		{
+			const auto block = _mm_loadu_si128(reinterpret_cast<const __m128i*>(data + index));
+			const auto lower = _mm_unpacklo_epi8(block, zero);
+			const auto upper = _mm_unpackhi_epi8(block, zero);
+			_mm_storeu_si128(reinterpret_cast<__m128i*>(out + index), lower);
+			_mm_storeu_si128(reinterpret_cast<__m128i*>(out + index + 8), upper);
+			index += 16;
+		}
+
+		copy_ascii_bytes_to_utf16_scalar(out + index, bytes.substr(index));
+#else
+		copy_ascii_bytes_to_utf16_scalar(out, bytes);
+#endif
+	}
+
+	template <typename CharT>
+	requires (sizeof(CharT) == 1)
+	inline constexpr void copy_ascii_bytes_to_utf16(char16_t* out, std::basic_string_view<CharT> bytes) noexcept
+	{
+		if (std::is_constant_evaluated())
+		{
+			copy_ascii_bytes_to_utf16_scalar(out, bytes);
+			return;
+		}
+
+		copy_ascii_bytes_to_utf16_runtime(out, bytes);
+	}
+
+	inline constexpr void copy_ascii_utf8_to_utf16_scalar(char16_t* out, std::u8string_view bytes) noexcept
+	{
+		for (std::size_t index = 0; index != bytes.size(); ++index)
+		{
+			out[index] = static_cast<char16_t>(static_cast<std::uint8_t>(bytes[index]));
+		}
+	}
+
+	inline void copy_ascii_utf8_to_utf16_runtime(char16_t* out, std::u8string_view bytes) noexcept
+	{
+#if UTF8_RANGES_HAS_SSE2_INTRINSICS
+		const auto* data = reinterpret_cast<const char*>(bytes.data());
+		const auto zero = _mm_setzero_si128();
+		std::size_t index = 0;
+		while (index + 16 <= bytes.size())
+		{
+			const auto block = _mm_loadu_si128(reinterpret_cast<const __m128i*>(data + index));
+			const auto lower = _mm_unpacklo_epi8(block, zero);
+			const auto upper = _mm_unpackhi_epi8(block, zero);
+			_mm_storeu_si128(reinterpret_cast<__m128i*>(out + index), lower);
+			_mm_storeu_si128(reinterpret_cast<__m128i*>(out + index + 8), upper);
+			index += 16;
+		}
+
+		copy_ascii_utf8_to_utf16_scalar(out + index, bytes.substr(index));
+#else
+		copy_ascii_utf8_to_utf16_scalar(out, bytes);
+#endif
+	}
+
+	inline constexpr void copy_ascii_utf8_to_utf16(char16_t* out, std::u8string_view bytes) noexcept
+	{
+		if (std::is_constant_evaluated())
+		{
+			copy_ascii_utf8_to_utf16_scalar(out, bytes);
+			return;
+		}
+
+		copy_ascii_utf8_to_utf16_runtime(out, bytes);
+	}
+
+	template <typename CharT>
+	requires (sizeof(CharT) == 2)
+	inline constexpr void copy_ascii_code_units_to_utf8_scalar(char8_t* out, std::basic_string_view<CharT> code_units) noexcept
+	{
+		for (std::size_t index = 0; index != code_units.size(); ++index)
+		{
+			out[index] = static_cast<char8_t>(static_cast<std::uint16_t>(code_units[index]));
+		}
+	}
+
+	template <typename CharT>
+	requires (sizeof(CharT) == 2)
+	inline void copy_ascii_code_units_to_utf8_runtime(char8_t* out, std::basic_string_view<CharT> code_units) noexcept
+	{
+#if UTF8_RANGES_HAS_SSE2_INTRINSICS
+		std::size_t index = 0;
+		while (index + 16 <= code_units.size())
+		{
+			const auto lower = _mm_loadu_si128(reinterpret_cast<const __m128i*>(code_units.data() + index));
+			const auto upper = _mm_loadu_si128(reinterpret_cast<const __m128i*>(code_units.data() + index + 8));
+			const auto packed = _mm_packus_epi16(lower, upper);
+			_mm_storeu_si128(reinterpret_cast<__m128i*>(out + index), packed);
+			index += 16;
+		}
+
+		copy_ascii_code_units_to_utf8_scalar(out + index, code_units.substr(index));
+#else
+		copy_ascii_code_units_to_utf8_scalar(out, code_units);
+#endif
+	}
+
+	template <typename CharT>
+	requires (sizeof(CharT) == 2)
+	inline constexpr void copy_ascii_code_units_to_utf8(char8_t* out, std::basic_string_view<CharT> code_units) noexcept
+	{
+		if (std::is_constant_evaluated())
+		{
+			copy_ascii_code_units_to_utf8_scalar(out, code_units);
+			return;
+		}
+
+		copy_ascii_code_units_to_utf8_runtime(out, code_units);
+	}
+
+	inline constexpr void copy_ascii_utf16_to_utf8_scalar(char8_t* out, std::u16string_view code_units) noexcept
+	{
+		for (std::size_t index = 0; index != code_units.size(); ++index)
+		{
+			out[index] = static_cast<char8_t>(code_units[index]);
+		}
+	}
+
+	inline void copy_ascii_utf16_to_utf8_runtime(char8_t* out, std::u16string_view code_units) noexcept
+	{
+#if UTF8_RANGES_HAS_SSE2_INTRINSICS
+		std::size_t index = 0;
+		while (index + 16 <= code_units.size())
+		{
+			const auto lower = _mm_loadu_si128(reinterpret_cast<const __m128i*>(code_units.data() + index));
+			const auto upper = _mm_loadu_si128(reinterpret_cast<const __m128i*>(code_units.data() + index + 8));
+			const auto packed = _mm_packus_epi16(lower, upper);
+			_mm_storeu_si128(reinterpret_cast<__m128i*>(out + index), packed);
+			index += 16;
+		}
+
+		copy_ascii_utf16_to_utf8_scalar(out + index, code_units.substr(index));
+#else
+		copy_ascii_utf16_to_utf8_scalar(out, code_units);
+#endif
+	}
+
+	inline constexpr void copy_ascii_utf16_to_utf8(char8_t* out, std::u16string_view code_units) noexcept
+	{
+		if (std::is_constant_evaluated())
+		{
+			copy_ascii_utf16_to_utf8_scalar(out, code_units);
+			return;
+		}
+
+		copy_ascii_utf16_to_utf8_runtime(out, code_units);
 	}
 
 	template <typename Allocator>
@@ -460,54 +1088,153 @@ namespace details
 		return (byte & encoding_constants::utf8_continuation_mask) != encoding_constants::utf8_continuation_tag;
 	}
 
+	inline constexpr bool is_utf8_continuation_byte(std::uint8_t byte) noexcept
+	{
+		return byte >= encoding_constants::utf8_continuation_min
+			&& byte <= encoding_constants::utf8_continuation_max;
+	}
+
 	template<typename CharT>
 	inline constexpr auto validate_utf8_sequence_at(
 		std::basic_string_view<CharT> value,
 		std::size_t index) noexcept -> std::expected<std::size_t, utf8_error>
 	{
 		const std::uint8_t lead = static_cast<std::uint8_t>(value[index]);
-		std::size_t expected_size = 0;
 		if (lead <= encoding_constants::ascii_scalar_max) [[likely]]
 		{
-			expected_size = encoding_constants::single_code_unit_count;
-		}
-		else if (lead >= encoding_constants::utf8_two_byte_lead_min && lead <= encoding_constants::utf8_two_byte_lead_max)
-		{
-			expected_size = encoding_constants::two_code_unit_count;
-		}
-		else if (lead >= encoding_constants::utf8_three_byte_lead_min && lead <= encoding_constants::utf8_three_byte_lead_max)
-		{
-			expected_size = encoding_constants::three_code_unit_count;
-		}
-		else if (lead >= encoding_constants::utf8_four_byte_lead_min && lead <= encoding_constants::utf8_four_byte_lead_max)
-		{
-			expected_size = encoding_constants::max_utf8_code_units;
-		}
-		else
-		{
-			return std::unexpected(utf8_error{
-				.code = utf8_error_code::invalid_lead_byte,
-				.first_invalid_byte_index = index
-			});
+			return encoding_constants::single_code_unit_count;
 		}
 
-		if (expected_size > value.size() - index) [[unlikely]]
+		const auto remaining = value.size() - index;
+		const auto byte_at = [&](std::size_t offset) noexcept -> std::uint8_t
 		{
-			return std::unexpected(utf8_error{
-				.code = utf8_error_code::truncated_sequence,
-				.first_invalid_byte_index = index
-			});
+			return static_cast<std::uint8_t>(value[index + offset]);
+		};
+
+		if (lead >= encoding_constants::utf8_two_byte_lead_min && lead <= encoding_constants::utf8_two_byte_lead_max)
+		{
+			if (remaining < encoding_constants::two_code_unit_count) [[unlikely]]
+			{
+				return std::unexpected(utf8_error{
+					.code = utf8_error_code::truncated_sequence,
+					.first_invalid_byte_index = index
+				});
+			}
+
+			if (!is_utf8_continuation_byte(byte_at(1))) [[unlikely]]
+			{
+				return std::unexpected(utf8_error{
+					.code = utf8_error_code::invalid_sequence,
+					.first_invalid_byte_index = index
+				});
+			}
+
+			return encoding_constants::two_code_unit_count;
 		}
 
-		if (!details::is_single_valid_utf8_char(value.substr(index, expected_size))) [[unlikely]]
+		if (lead >= encoding_constants::utf8_three_byte_lead_min && lead <= encoding_constants::utf8_three_byte_lead_max)
 		{
-			return std::unexpected(utf8_error{
-				.code = utf8_error_code::invalid_sequence,
-				.first_invalid_byte_index = index
-			});
+			if (remaining < encoding_constants::three_code_unit_count) [[unlikely]]
+			{
+				return std::unexpected(utf8_error{
+					.code = utf8_error_code::truncated_sequence,
+					.first_invalid_byte_index = index
+				});
+			}
+
+			const auto second = byte_at(1);
+			const auto third = byte_at(2);
+			const auto third_is_continuation = is_utf8_continuation_byte(third);
+			const bool valid =
+				(
+					lead == encoding_constants::utf8_three_byte_lead_min
+					&& second >= encoding_constants::utf8_e0_second_byte_min
+					&& second <= encoding_constants::utf8_continuation_max
+					&& third_is_continuation
+				)
+				|| (
+					lead >= encoding_constants::utf8_three_byte_lead_after_e0_min
+					&& lead <= encoding_constants::utf8_three_byte_lead_before_surrogate_max
+					&& is_utf8_continuation_byte(second)
+					&& third_is_continuation
+				)
+				|| (
+					lead == encoding_constants::utf8_surrogate_boundary_lead
+					&& second >= encoding_constants::utf8_continuation_min
+					&& second <= encoding_constants::utf8_ed_second_byte_max
+					&& third_is_continuation
+				)
+				|| (
+					lead >= encoding_constants::utf8_three_byte_lead_after_surrogate_min
+					&& lead <= encoding_constants::utf8_three_byte_lead_max
+					&& is_utf8_continuation_byte(second)
+					&& third_is_continuation
+				);
+
+			if (!valid) [[unlikely]]
+			{
+				return std::unexpected(utf8_error{
+					.code = utf8_error_code::invalid_sequence,
+					.first_invalid_byte_index = index
+				});
+			}
+
+			return encoding_constants::three_code_unit_count;
 		}
 
-		return expected_size;
+		if (lead >= encoding_constants::utf8_four_byte_lead_min && lead <= encoding_constants::utf8_four_byte_lead_max)
+		{
+			if (remaining < encoding_constants::max_utf8_code_units) [[unlikely]]
+			{
+				return std::unexpected(utf8_error{
+					.code = utf8_error_code::truncated_sequence,
+					.first_invalid_byte_index = index
+				});
+			}
+
+			const auto second = byte_at(1);
+			const auto third = byte_at(2);
+			const auto fourth = byte_at(3);
+			const auto third_is_continuation = is_utf8_continuation_byte(third);
+			const auto fourth_is_continuation = is_utf8_continuation_byte(fourth);
+			const bool valid =
+				(
+					lead == encoding_constants::utf8_four_byte_lead_min
+					&& second >= encoding_constants::utf8_f0_second_byte_min
+					&& second <= encoding_constants::utf8_continuation_max
+					&& third_is_continuation
+					&& fourth_is_continuation
+				)
+				|| (
+					lead >= encoding_constants::utf8_four_byte_lead_after_f0_min
+					&& lead <= encoding_constants::utf8_four_byte_lead_before_f4_max
+					&& is_utf8_continuation_byte(second)
+					&& third_is_continuation
+					&& fourth_is_continuation
+				)
+				|| (
+					lead == encoding_constants::utf8_four_byte_lead_max
+					&& second >= encoding_constants::utf8_continuation_min
+					&& second <= encoding_constants::utf8_f4_second_byte_max
+					&& third_is_continuation
+					&& fourth_is_continuation
+				);
+
+			if (!valid) [[unlikely]]
+			{
+				return std::unexpected(utf8_error{
+					.code = utf8_error_code::invalid_sequence,
+					.first_invalid_byte_index = index
+				});
+			}
+
+			return encoding_constants::max_utf8_code_units;
+		}
+
+		return std::unexpected(utf8_error{
+			.code = utf8_error_code::invalid_lead_byte,
+			.first_invalid_byte_index = index
+		});
 	}
 
 	template<typename CharT>
@@ -550,7 +1277,13 @@ namespace details
 	}
 
 	template<typename CharT>
+	inline constexpr std::uint32_t decode_valid_utf8_char(const CharT* ch, std::size_t size) noexcept;
+
+	template<typename CharT>
 	inline constexpr std::uint32_t decode_valid_utf8_char(std::basic_string_view<CharT> ch) noexcept;
+
+	template<typename CharT>
+	inline constexpr std::uint32_t decode_valid_utf16_char(const CharT* ch, std::size_t size) noexcept;
 
 	template<typename CharT>
 	inline constexpr std::uint32_t decode_valid_utf16_char(std::basic_string_view<CharT> ch) noexcept;
@@ -561,6 +1294,14 @@ namespace details
 		std::size_t index = 0;
 		while (index < value.size())
 		{
+			const auto remaining = std::basic_string_view<CharT>{ value.data() + index, value.size() - index };
+			const auto ascii_run = ascii_prefix_length(remaining);
+			index += ascii_run;
+			if (index == value.size())
+			{
+				break;
+			}
+
 			const auto expected_size = validate_utf8_sequence_at(value, index);
 			if (!expected_size) [[unlikely]]
 			{
@@ -579,6 +1320,14 @@ namespace details
 		std::size_t index = 0;
 		while (index < value.size())
 		{
+			const auto remaining = std::basic_string_view<CharT>{ value.data() + index, value.size() - index };
+			const auto ascii_run = ascii_prefix_length(remaining);
+			index += ascii_run;
+			if (index == value.size())
+			{
+				break;
+			}
+
 			const auto sequence_length = validate_utf16_sequence_at(value, index);
 			if (!sequence_length) [[unlikely]]
 			{
@@ -621,6 +1370,16 @@ namespace details
 				std::size_t read_index = 0;
 				while (read_index < bytes.size())
 				{
+					const auto remaining = std::string_view{ bytes.data() + read_index, bytes.size() - read_index };
+					const auto ascii_run = ascii_prefix_length(remaining);
+					if (ascii_run != 0)
+					{
+						copy_ascii_bytes_to_utf8(buffer + write_index, remaining.substr(0, ascii_run));
+						write_index += ascii_run;
+						read_index += ascii_run;
+						continue;
+					}
+
 					const auto sequence_length = validate_utf8_sequence_at(bytes, read_index);
 					if (!sequence_length) [[unlikely]]
 					{
@@ -662,6 +1421,16 @@ namespace details
 				std::size_t read_index = 0;
 				while (read_index < bytes.size())
 				{
+					const auto remaining = std::string_view{ bytes.data() + read_index, bytes.size() - read_index };
+					const auto ascii_run = ascii_prefix_length(remaining);
+					if (ascii_run != 0)
+					{
+						copy_ascii_bytes_to_utf16(buffer + write_index, remaining.substr(0, ascii_run));
+						write_index += ascii_run;
+						read_index += ascii_run;
+						continue;
+					}
+
 					const auto sequence_length = validate_utf8_sequence_at(bytes, read_index);
 					if (!sequence_length) [[unlikely]]
 					{
@@ -669,8 +1438,7 @@ namespace details
 						return std::size_t{ 0 };
 					}
 
-					const auto scalar = decode_valid_utf8_char(
-						std::basic_string_view<char>{ bytes.data() + read_index, *sequence_length });
+					const auto scalar = decode_valid_utf8_char(bytes.data() + read_index, *sequence_length);
 					write_index += encode_unicode_scalar_utf16_unchecked(scalar, buffer + write_index);
 					read_index += *sequence_length;
 				}
@@ -701,6 +1469,16 @@ namespace details
 				std::size_t read_index = 0;
 				while (read_index < code_units.size())
 				{
+					const auto remaining = std::wstring_view{ code_units.data() + read_index, code_units.size() - read_index };
+					const auto ascii_run = ascii_prefix_length(remaining);
+					if (ascii_run != 0)
+					{
+						copy_ascii_code_units_to_utf8(buffer + write_index, remaining.substr(0, ascii_run));
+						write_index += ascii_run;
+						read_index += ascii_run;
+						continue;
+					}
+
 					const auto sequence_length = validate_utf16_sequence_at(code_units, read_index);
 					if (!sequence_length) [[unlikely]]
 					{
@@ -708,8 +1486,7 @@ namespace details
 						return std::size_t{ 0 };
 					}
 
-					const auto scalar = decode_valid_utf16_char(
-						std::basic_string_view<wchar_t>{ code_units.data() + read_index, *sequence_length });
+					const auto scalar = decode_valid_utf16_char(code_units.data() + read_index, *sequence_length);
 					write_index += encode_unicode_scalar_utf8_unchecked(scalar, buffer + write_index);
 					read_index += *sequence_length;
 				}
@@ -739,6 +1516,19 @@ namespace details
 				std::size_t write_index = 0;
 				while (write_index < code_units.size())
 				{
+					const auto remaining = std::wstring_view{ code_units.data() + write_index, code_units.size() - write_index };
+					const auto ascii_run = ascii_prefix_length(remaining);
+					if (ascii_run != 0)
+					{
+						for (std::size_t i = 0; i != ascii_run; ++i)
+						{
+							buffer[write_index + i] = static_cast<char16_t>(code_units[write_index + i]);
+						}
+
+						write_index += ascii_run;
+						continue;
+					}
+
 					const auto sequence_length = validate_utf16_sequence_at(code_units, write_index);
 					if (!sequence_length) [[unlikely]]
 					{
@@ -842,25 +1632,25 @@ namespace details
 	}
 
 	template<typename CharT>
-	inline constexpr std::uint32_t decode_valid_utf8_char(std::basic_string_view<CharT> ch) noexcept
+	inline constexpr std::uint32_t decode_valid_utf8_char(const CharT* ch, std::size_t size) noexcept
 	{
-		const auto byte = [&ch](std::size_t index) noexcept -> std::uint8_t
+		const auto byte = [ch](std::size_t index) noexcept -> std::uint8_t
 		{
 			return static_cast<std::uint8_t>(ch[index]);
 		};
 
-		if (ch.size() == encoding_constants::single_code_unit_count) [[likely]]
+		if (size == encoding_constants::single_code_unit_count) [[likely]]
 		{
 			return byte(0);
 		}
 
-		if (ch.size() == encoding_constants::two_code_unit_count)
+		if (size == encoding_constants::two_code_unit_count)
 		{
 			return (static_cast<std::uint32_t>(byte(0) & encoding_constants::utf8_two_byte_payload_mask) << encoding_constants::utf8_two_byte_lead_shift) |
 				(static_cast<std::uint32_t>(byte(1) & encoding_constants::utf8_continuation_payload_mask));
 		}
 
-		if (ch.size() == encoding_constants::three_code_unit_count)
+		if (size == encoding_constants::three_code_unit_count)
 		{
 			return (static_cast<std::uint32_t>(byte(0) & encoding_constants::utf8_three_byte_payload_mask) << encoding_constants::utf8_three_byte_lead_shift) |
 				(static_cast<std::uint32_t>(byte(1) & encoding_constants::utf8_continuation_payload_mask) << encoding_constants::utf8_continuation_payload_bits) |
@@ -874,9 +1664,15 @@ namespace details
 	}
 
 	template<typename CharT>
-	inline constexpr std::uint32_t decode_valid_utf16_char(std::basic_string_view<CharT> ch) noexcept
+	inline constexpr std::uint32_t decode_valid_utf8_char(std::basic_string_view<CharT> ch) noexcept
 	{
-		if (ch.size() == encoding_constants::single_code_unit_count) [[likely]]
+		return decode_valid_utf8_char(ch.data(), ch.size());
+	}
+
+	template<typename CharT>
+	inline constexpr std::uint32_t decode_valid_utf16_char(const CharT* ch, std::size_t size) noexcept
+	{
+		if (size == encoding_constants::single_code_unit_count) [[likely]]
 		{
 			return static_cast<std::uint16_t>(ch[0]);
 		}
@@ -884,6 +1680,12 @@ namespace details
 		const auto high = static_cast<std::uint16_t>(ch[0]) - encoding_constants::high_surrogate_min;
 		const auto low = static_cast<std::uint16_t>(ch[1]) - encoding_constants::low_surrogate_min;
 		return encoding_constants::supplementary_plane_base + (static_cast<std::uint32_t>(high) << encoding_constants::utf16_high_surrogate_shift) + low;
+	}
+
+	template<typename CharT>
+	inline constexpr std::uint32_t decode_valid_utf16_char(std::basic_string_view<CharT> ch) noexcept
+	{
+		return decode_valid_utf16_char(ch.data(), ch.size());
 	}
 
 	struct decoded_scalar
@@ -896,7 +1698,7 @@ namespace details
 	{
 		const auto len = utf8_byte_count_from_lead(static_cast<std::uint8_t>(text[index]));
 		return decoded_scalar{
-			.scalar = decode_valid_utf8_char(text.substr(index, len)),
+			.scalar = decode_valid_utf8_char(text.data() + index, len),
 			.next_index = index + len
 		};
 	}
@@ -908,7 +1710,7 @@ namespace details
 			? encoding_constants::utf16_surrogate_code_unit_count
 			: encoding_constants::single_code_unit_count;
 		return decoded_scalar{
-			.scalar = decode_valid_utf16_char(text.substr(index, len)),
+			.scalar = decode_valid_utf16_char(text.data() + index, len),
 			.next_index = index + len
 		};
 	}
