@@ -62,6 +62,24 @@ struct CaseMappingRecord {
     mapped: Vec<u32>,
 }
 
+struct SimpleCaseMappingRecord {
+    source: u32,
+    mapped: u32,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+struct GraphemePropertiesValue {
+    grapheme_break_index: usize,
+    indic_conjunct_break_index: usize,
+    extended_pictographic: bool,
+}
+
+struct GraphemePropertiesRangeRecord {
+    first: u32,
+    last: u32,
+    value: GraphemePropertiesValue,
+}
+
 fn collect_ranges<F: Fn(char) -> bool>(pred: F) -> Vec<Range> {
     let mut ranges = Vec::new();
     let mut start: Option<u32> = None;
@@ -125,6 +143,140 @@ fn collect_case_mappings<F: Fn(char) -> Vec<u32>>(map: F) -> Vec<CaseMappingReco
     mappings
 }
 
+fn split_case_mappings(mappings: &[CaseMappingRecord]) -> (Vec<SimpleCaseMappingRecord>, Vec<CaseMappingRecord>) {
+    let mut simple = Vec::new();
+    let mut special = Vec::new();
+
+    for mapping in mappings {
+        if mapping.mapped.len() == 1 {
+            simple.push(SimpleCaseMappingRecord {
+                source: mapping.source,
+                mapped: mapping.mapped[0],
+            });
+        } else {
+            special.push(CaseMappingRecord {
+                source: mapping.source,
+                mapped: mapping.mapped.clone(),
+            });
+        }
+    }
+
+    (simple, special)
+}
+
+fn contains_scalar_in_ranges(ranges: &[Range], scalar: u32) -> bool {
+    let mut left = 0usize;
+    let mut right = ranges.len();
+
+    while left < right {
+        let mid = left + (right - left) / 2;
+        let (first, last) = ranges[mid];
+        if scalar < first {
+            right = mid;
+        } else if scalar > last {
+            left = mid + 1;
+        } else {
+            return true;
+        }
+    }
+
+    false
+}
+
+fn grapheme_break_index_for_scalar(
+    grapheme_break_ranges: &BTreeMap<String, Vec<Range>>,
+    scalar: u32,
+) -> usize {
+    for (index, &(name, _, _)) in GRAPHEME_BREAK_VALUES.iter().enumerate() {
+        if grapheme_break_ranges
+            .get(name)
+            .is_some_and(|ranges| contains_scalar_in_ranges(ranges, scalar))
+        {
+            return index + 1;
+        }
+    }
+
+    0
+}
+
+fn indic_conjunct_break_index_for_scalar(
+    indic_conjunct_break_ranges: &BTreeMap<String, Vec<Range>>,
+    scalar: u32,
+) -> usize {
+    for (index, &(name, _, _)) in INDIC_CONJUNCT_BREAK_VALUES.iter().enumerate() {
+        if indic_conjunct_break_ranges
+            .get(name)
+            .is_some_and(|ranges| contains_scalar_in_ranges(ranges, scalar))
+        {
+            return index + 1;
+        }
+    }
+
+    0
+}
+
+fn push_range_boundaries(boundaries: &mut Vec<u32>, ranges: &[Range]) {
+    for &(first, last) in ranges {
+        boundaries.push(first);
+        boundaries.push(last.saturating_add(1));
+    }
+}
+
+fn collect_grapheme_properties_ranges(
+    grapheme_break_ranges: &BTreeMap<String, Vec<Range>>,
+    extended_pictographic_ranges: &[Range],
+    indic_conjunct_break_ranges: &BTreeMap<String, Vec<Range>>,
+) -> Vec<GraphemePropertiesRangeRecord> {
+    let mut boundaries = vec![0, 0x110000];
+
+    for ranges in grapheme_break_ranges.values() {
+        push_range_boundaries(&mut boundaries, ranges);
+    }
+
+    push_range_boundaries(&mut boundaries, extended_pictographic_ranges);
+
+    for ranges in indic_conjunct_break_ranges.values() {
+        push_range_boundaries(&mut boundaries, ranges);
+    }
+
+    boundaries.sort_unstable();
+    boundaries.dedup();
+
+    let mut result: Vec<GraphemePropertiesRangeRecord> = Vec::new();
+    for boundary_pair in boundaries.windows(2) {
+        let first = boundary_pair[0];
+        let next = boundary_pair[1];
+        if first >= 0x110000 || first == next {
+            continue;
+        }
+
+        let last = next - 1;
+        let value = GraphemePropertiesValue {
+            grapheme_break_index: grapheme_break_index_for_scalar(grapheme_break_ranges, first),
+            indic_conjunct_break_index: indic_conjunct_break_index_for_scalar(indic_conjunct_break_ranges, first),
+            extended_pictographic: contains_scalar_in_ranges(extended_pictographic_ranges, first),
+        };
+
+        if value.grapheme_break_index == 0
+            && value.indic_conjunct_break_index == 0
+            && !value.extended_pictographic
+        {
+            continue;
+        }
+
+        if let Some(previous) = result.last_mut() {
+            if previous.last + 1 == first && previous.value == value {
+                previous.last = last;
+                continue;
+            }
+        }
+
+        result.push(GraphemePropertiesRangeRecord { first, last, value });
+    }
+
+    result
+}
+
 fn emit_ranges(name: &str, ranges: &[Range]) {
     println!(
         "inline constexpr std::array<unicode_range, {}> {}{{{{",
@@ -151,7 +303,13 @@ fn emit_case_mapping_support(max_length: usize) {
         "inline constexpr std::size_t unicode_case_mapping_max_length = {max_length};"
     );
     println!();
-    println!("struct unicode_case_mapping");
+    println!("struct unicode_simple_case_mapping");
+    println!("{{");
+    println!("    std::uint32_t source;");
+    println!("    std::uint32_t mapped;");
+    println!("}};");
+    println!();
+    println!("struct unicode_special_case_mapping");
     println!("{{");
     println!("    std::uint32_t source;");
     println!("    std::uint8_t count;");
@@ -160,17 +318,44 @@ fn emit_case_mapping_support(max_length: usize) {
     );
     println!("}};");
     println!();
-    println!("template <std::size_t N>");
+    println!("inline constexpr std::size_t unicode_mapping_page_shift = 8;");
+    println!("inline constexpr std::size_t unicode_mapping_page_count = (0x10FFFFu >> unicode_mapping_page_shift) + 1u;");
+    println!();
+    println!("template <typename Mapping, std::size_t N>");
     println!(
-        "constexpr const unicode_case_mapping* find_case_mapping(std::uint32_t scalar, const std::array<unicode_case_mapping, N>& mappings) noexcept"
+        "constexpr auto make_source_mapping_page_index(const std::array<Mapping, N>& mappings) noexcept"
     );
     println!("{{");
-    println!("    std::size_t left = 0;");
-    println!("    std::size_t right = N;");
+    println!("    std::array<std::uint16_t, unicode_mapping_page_count + 1> page_index{{}};");
+    println!("    std::size_t mapping_index = 0;");
+    println!("    for (std::size_t page = 0; page != unicode_mapping_page_count; ++page)");
+    println!("    {{");
+    println!("        page_index[page] = static_cast<std::uint16_t>(mapping_index);");
+    println!("        const auto page_end = static_cast<std::uint32_t>((page + 1u) << unicode_mapping_page_shift);");
+    println!("        while (mapping_index < N && mappings[mapping_index].source < page_end)");
+    println!("        {{");
+    println!("            ++mapping_index;");
+    println!("        }}");
+    println!("    }}");
+    println!("    page_index[unicode_mapping_page_count] = static_cast<std::uint16_t>(mapping_index);");
+    println!("    return page_index;");
+    println!("}}");
+    println!();
+    println!("template <typename Mapping, std::size_t N, std::size_t P>");
+    println!(
+        "constexpr const Mapping* find_source_mapping_paged("
+    );
+    println!("    std::uint32_t scalar,");
+    println!("    const std::array<Mapping, N>& mappings,");
+    println!("    const std::array<std::uint16_t, P>& page_index) noexcept");
+    println!("{{");
+    println!("    const auto page = static_cast<std::size_t>(scalar >> unicode_mapping_page_shift);");
+    println!("    std::size_t left = page_index[page];");
+    println!("    std::size_t right = page_index[page + 1u];");
     println!("    while (left < right)");
     println!("    {{");
     println!("        const std::size_t mid = left + (right - left) / 2;");
-    println!("        const unicode_case_mapping& mapping = mappings[mid];");
+    println!("        const Mapping& mapping = mappings[mid];");
     println!("        if (scalar < mapping.source)");
     println!("        {{");
     println!("            right = mid;");
@@ -189,9 +374,26 @@ fn emit_case_mapping_support(max_length: usize) {
     println!();
 }
 
-fn emit_case_mappings(name: &str, mappings: &[CaseMappingRecord], max_length: usize) {
+fn emit_simple_case_mappings(name: &str, mappings: &[SimpleCaseMappingRecord]) {
     println!(
-        "inline constexpr std::array<unicode_case_mapping, {}> {}{{{{",
+        "inline constexpr std::array<unicode_simple_case_mapping, {}> {}{{{{",
+        mappings.len(),
+        name
+    );
+    for mapping in mappings {
+        println!(
+            "    {{ 0x{:04X}u, 0x{:04X}u }},",
+            mapping.source,
+            mapping.mapped
+        );
+    }
+    println!("}}}};");
+    println!();
+}
+
+fn emit_special_case_mappings(name: &str, mappings: &[CaseMappingRecord], max_length: usize) {
+    println!(
+        "inline constexpr std::array<unicode_special_case_mapping, {}> {}{{{{",
         mappings.len(),
         name
     );
@@ -214,12 +416,111 @@ fn emit_case_mappings(name: &str, mappings: &[CaseMappingRecord], max_length: us
     println!();
 }
 
-fn emit_case_mapping_lookup(fn_name: &str, mappings_name: &str) {
+fn emit_source_mapping_lookup(fn_name: &str, mapping_type: &str, mappings_name: &str) {
     println!(
-        "constexpr const unicode_case_mapping* {fn_name}(std::uint32_t scalar) noexcept"
+        "inline constexpr auto {mappings_name}_page_index = make_source_mapping_page_index({mappings_name});"
+    );
+    println!();
+    println!(
+        "constexpr const {mapping_type}* {fn_name}(std::uint32_t scalar) noexcept"
     );
     println!("{{");
-    println!("    return find_case_mapping(scalar, {mappings_name});");
+    println!(
+        "    return find_source_mapping_paged(scalar, {mappings_name}, {mappings_name}_page_index);"
+    );
+    println!("}}");
+    println!();
+}
+
+fn emit_grapheme_property_support() {
+    println!("struct unicode_grapheme_properties");
+    println!("{{");
+    println!("    grapheme_cluster_break_property break_property;");
+    println!("    indic_conjunct_break_property indic_property;");
+    println!("    bool extended_pictographic;");
+    println!("}};");
+    println!();
+    println!("struct unicode_grapheme_property_range");
+    println!("{{");
+    println!("    std::uint32_t first;");
+    println!("    std::uint32_t last;");
+    println!("    unicode_grapheme_properties properties;");
+    println!("}};");
+    println!();
+    println!("template <std::size_t N>");
+    println!(
+        "constexpr const unicode_grapheme_property_range* find_grapheme_property_range(std::uint32_t scalar, const std::array<unicode_grapheme_property_range, N>& ranges) noexcept"
+    );
+    println!("{{");
+    println!("    std::size_t left = 0;");
+    println!("    std::size_t right = N;");
+    println!("    while (left < right)");
+    println!("    {{");
+    println!("        const std::size_t mid = left + (right - left) / 2;");
+    println!("        const unicode_grapheme_property_range range = ranges[mid];");
+    println!("        if (scalar < range.first)");
+    println!("        {{");
+    println!("            right = mid;");
+    println!("        }}");
+    println!("        else if (scalar > range.last)");
+    println!("        {{");
+    println!("            left = mid + 1;");
+    println!("        }}");
+    println!("        else");
+    println!("        {{");
+    println!("            return &ranges[mid];");
+    println!("        }}");
+    println!("    }}");
+    println!("    return nullptr;");
+    println!("}}");
+    println!();
+}
+
+fn emit_grapheme_property_ranges(name: &str, ranges: &[GraphemePropertiesRangeRecord]) {
+    println!(
+        "inline constexpr std::array<unicode_grapheme_property_range, {}> {}{{{{",
+        ranges.len(),
+        name
+    );
+    for range in ranges {
+        let break_property = if range.value.grapheme_break_index == 0 {
+            "grapheme_cluster_break_property::other"
+        } else {
+            GRAPHEME_BREAK_VALUES[range.value.grapheme_break_index - 1].2
+        };
+        let indic_property = if range.value.indic_conjunct_break_index == 0 {
+            "indic_conjunct_break_property::none"
+        } else {
+            INDIC_CONJUNCT_BREAK_VALUES[range.value.indic_conjunct_break_index - 1].2
+        };
+        println!(
+            "    {{ 0x{:04X}u, 0x{:04X}u, {{ {}, {}, {} }} }},",
+            range.first,
+            range.last,
+            break_property,
+            indic_property,
+            if range.value.extended_pictographic { "true" } else { "false" }
+        );
+    }
+    println!("}}}};");
+    println!();
+}
+
+fn emit_grapheme_property_lookup(fn_name: &str, ranges_name: &str) {
+    println!(
+        "constexpr unicode_grapheme_properties {fn_name}(std::uint32_t scalar) noexcept"
+    );
+    println!("{{");
+    println!("    if (const auto* range = find_grapheme_property_range(scalar, {ranges_name}); range != nullptr)");
+    println!("    {{");
+    println!("        return range->properties;");
+    println!("    }}");
+    println!();
+    println!("    return unicode_grapheme_properties{{");
+    println!("        grapheme_cluster_break_property::other,");
+    println!("        indic_conjunct_break_property::none,");
+    println!("        false");
+    println!("    }};");
     println!("}}");
     println!();
 }
@@ -435,12 +736,21 @@ fn main() -> io::Result<()> {
     )?;
     let indic_conjunct_break_ranges =
         collect_indic_conjunct_break_ranges(&data_root.join("ucd").join("DerivedCoreProperties.txt"))?;
+    let grapheme_properties_ranges = collect_grapheme_properties_ranges(
+        &grapheme_break_ranges,
+        &extended_pictographic_ranges,
+        &indic_conjunct_break_ranges,
+    );
     let lowercase_mappings =
         collect_case_mappings(|ch| ch.to_lowercase().map(|mapped| mapped as u32).collect());
     let uppercase_mappings =
         collect_case_mappings(|ch| ch.to_uppercase().map(|mapped| mapped as u32).collect());
-    let unicode_case_mapping_max_length = case_mapping_max_length(&lowercase_mappings)
-        .max(case_mapping_max_length(&uppercase_mappings));
+    let (lowercase_simple_mappings, lowercase_special_mappings) =
+        split_case_mappings(&lowercase_mappings);
+    let (uppercase_simple_mappings, uppercase_special_mappings) =
+        split_case_mappings(&uppercase_mappings);
+    let unicode_case_mapping_max_length = case_mapping_max_length(&lowercase_special_mappings)
+        .max(case_mapping_max_length(&uppercase_special_mappings));
     println!("#ifndef UTF8_RANGES_UNICODE_TABLES_HPP");
     println!("#define UTF8_RANGES_UNICODE_TABLES_HPP");
     println!();
@@ -510,6 +820,7 @@ fn main() -> io::Result<()> {
         "indic_conjunct_break_property",
         &["none", "consonant", "extend", "linker"],
     );
+    emit_grapheme_property_support();
 
     emit_ranges("alphabetic_ranges", &collect_ranges(|ch| ch.is_alphabetic()));
     emit_ranges("lowercase_ranges", &collect_ranges(|ch| ch.is_lowercase()));
@@ -518,35 +829,19 @@ fn main() -> io::Result<()> {
     emit_ranges("control_ranges", &collect_ranges(|ch| ch.is_control()));
     emit_ranges("numeric_ranges", &collect_ranges(|ch| ch.is_numeric()));
     emit_ranges("digit_ranges", &collect_ranges(|ch| ch.is_digit(10)));
-    emit_case_mappings(
-        "lowercase_mappings",
-        &lowercase_mappings,
+    emit_simple_case_mappings("lowercase_simple_mappings", &lowercase_simple_mappings);
+    emit_special_case_mappings(
+        "lowercase_special_mappings",
+        &lowercase_special_mappings,
         unicode_case_mapping_max_length,
     );
-    emit_case_mappings(
-        "uppercase_mappings",
-        &uppercase_mappings,
+    emit_simple_case_mappings("uppercase_simple_mappings", &uppercase_simple_mappings);
+    emit_special_case_mappings(
+        "uppercase_special_mappings",
+        &uppercase_special_mappings,
         unicode_case_mapping_max_length,
     );
-
-    for &(name, ranges_name, _) in GRAPHEME_BREAK_VALUES {
-        let ranges = grapheme_break_ranges
-            .get(name)
-            .map_or(&[][..], Vec::as_slice);
-        emit_ranges(ranges_name, ranges);
-    }
-
-    emit_ranges(
-        "extended_pictographic_ranges",
-        &extended_pictographic_ranges,
-    );
-
-    for &(name, ranges_name, _) in INDIC_CONJUNCT_BREAK_VALUES {
-        let ranges = indic_conjunct_break_ranges
-            .get(name)
-            .map_or(&[][..], Vec::as_slice);
-        emit_ranges(ranges_name, ranges);
-    }
+    emit_grapheme_property_ranges("grapheme_properties_ranges", &grapheme_properties_ranges);
 
     emit_bool_lookup("is_alphabetic", "alphabetic_ranges");
     emit_bool_lookup("is_lowercase", "lowercase_ranges");
@@ -555,21 +850,42 @@ fn main() -> io::Result<()> {
     emit_bool_lookup("is_control", "control_ranges");
     emit_bool_lookup("is_numeric", "numeric_ranges");
     emit_bool_lookup("is_digit", "digit_ranges");
-    emit_case_mapping_lookup("lowercase_mapping", "lowercase_mappings");
-    emit_case_mapping_lookup("uppercase_mapping", "uppercase_mappings");
-    emit_property_lookup(
-        "grapheme_cluster_break",
-        "grapheme_cluster_break_property",
-        "other",
-        GRAPHEME_BREAK_VALUES,
+    emit_source_mapping_lookup(
+        "lowercase_simple_mapping",
+        "unicode_simple_case_mapping",
+        "lowercase_simple_mappings",
     );
-    emit_bool_lookup("is_extended_pictographic", "extended_pictographic_ranges");
-    emit_property_lookup(
-        "indic_conjunct_break",
-        "indic_conjunct_break_property",
-        "none",
-        INDIC_CONJUNCT_BREAK_VALUES,
+    emit_source_mapping_lookup(
+        "lowercase_special_mapping",
+        "unicode_special_case_mapping",
+        "lowercase_special_mappings",
     );
+    emit_source_mapping_lookup(
+        "uppercase_simple_mapping",
+        "unicode_simple_case_mapping",
+        "uppercase_simple_mappings",
+    );
+    emit_source_mapping_lookup(
+        "uppercase_special_mapping",
+        "unicode_special_case_mapping",
+        "uppercase_special_mappings",
+    );
+    emit_grapheme_property_lookup("grapheme_properties", "grapheme_properties_ranges");
+    println!("constexpr grapheme_cluster_break_property grapheme_cluster_break(std::uint32_t scalar) noexcept");
+    println!("{{");
+    println!("    return grapheme_properties(scalar).break_property;");
+    println!("}}");
+    println!();
+    println!("constexpr bool is_extended_pictographic(std::uint32_t scalar) noexcept");
+    println!("{{");
+    println!("    return grapheme_properties(scalar).extended_pictographic;");
+    println!("}}");
+    println!();
+    println!("constexpr indic_conjunct_break_property indic_conjunct_break(std::uint32_t scalar) noexcept");
+    println!("{{");
+    println!("    return grapheme_properties(scalar).indic_property;");
+    println!("}}");
+    println!();
 
     println!("}}");
     println!("}}");

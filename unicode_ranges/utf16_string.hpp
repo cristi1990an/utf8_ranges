@@ -905,9 +905,40 @@ public:
 	}
 
 	[[nodiscard]]
+	constexpr basic_utf16_string to_ascii_lowercase(size_type pos, size_type count) const&
+	{
+		return static_cast<const crtp&>(*this).template to_ascii_lowercase<Allocator>(pos, count, base_.get_allocator());
+	}
+
+	[[nodiscard]]
 	constexpr basic_utf16_string to_ascii_lowercase() && noexcept
 	{
 		details::ascii_lowercase_inplace(base_.data(), base_.size());
+		return std::move(*this);
+	}
+
+	[[nodiscard]]
+	constexpr basic_utf16_string to_ascii_lowercase(size_type pos, size_type count) &&
+	{
+		if (pos > size()) [[unlikely]]
+		{
+			throw std::out_of_range("case transform index out of range");
+		}
+
+		const auto remaining = size() - pos;
+		const auto transform_count = count == npos ? remaining : count;
+		if (transform_count > remaining) [[unlikely]]
+		{
+			throw std::out_of_range("case transform count out of range");
+		}
+
+		const auto end = pos + transform_count;
+		if (!this->is_char_boundary(pos) || !this->is_char_boundary(end)) [[unlikely]]
+		{
+			throw std::out_of_range("case transform range must be a valid UTF-16 substring");
+		}
+
+		details::ascii_lowercase_inplace(base_.data() + pos, transform_count);
 		return std::move(*this);
 	}
 
@@ -918,6 +949,16 @@ public:
 		return static_cast<const crtp&>(*this).template to_ascii_lowercase<OtherAllocator>(alloc);
 	}
 
+	template <typename OtherAllocator>
+	[[nodiscard]]
+	constexpr basic_utf16_string<OtherAllocator> to_ascii_lowercase(
+		size_type pos,
+		size_type count,
+		const OtherAllocator& alloc) const
+	{
+		return static_cast<const crtp&>(*this).template to_ascii_lowercase<OtherAllocator>(pos, count, alloc);
+	}
+
 	[[nodiscard]]
 	constexpr basic_utf16_string to_ascii_uppercase() const&
 	{
@@ -925,9 +966,40 @@ public:
 	}
 
 	[[nodiscard]]
+	constexpr basic_utf16_string to_ascii_uppercase(size_type pos, size_type count) const&
+	{
+		return static_cast<const crtp&>(*this).template to_ascii_uppercase<Allocator>(pos, count, base_.get_allocator());
+	}
+
+	[[nodiscard]]
 	constexpr basic_utf16_string to_ascii_uppercase() && noexcept
 	{
 		details::ascii_uppercase_inplace(base_.data(), base_.size());
+		return std::move(*this);
+	}
+
+	[[nodiscard]]
+	constexpr basic_utf16_string to_ascii_uppercase(size_type pos, size_type count) &&
+	{
+		if (pos > size()) [[unlikely]]
+		{
+			throw std::out_of_range("case transform index out of range");
+		}
+
+		const auto remaining = size() - pos;
+		const auto transform_count = count == npos ? remaining : count;
+		if (transform_count > remaining) [[unlikely]]
+		{
+			throw std::out_of_range("case transform count out of range");
+		}
+
+		const auto end = pos + transform_count;
+		if (!this->is_char_boundary(pos) || !this->is_char_boundary(end)) [[unlikely]]
+		{
+			throw std::out_of_range("case transform range must be a valid UTF-16 substring");
+		}
+
+		details::ascii_uppercase_inplace(base_.data() + pos, transform_count);
 		return std::move(*this);
 	}
 
@@ -938,10 +1010,26 @@ public:
 		return static_cast<const crtp&>(*this).template to_ascii_uppercase<OtherAllocator>(alloc);
 	}
 
+	template <typename OtherAllocator>
+	[[nodiscard]]
+	constexpr basic_utf16_string<OtherAllocator> to_ascii_uppercase(
+		size_type pos,
+		size_type count,
+		const OtherAllocator& alloc) const
+	{
+		return static_cast<const crtp&>(*this).template to_ascii_uppercase<OtherAllocator>(pos, count, alloc);
+	}
+
 	[[nodiscard]]
 	constexpr basic_utf16_string to_lowercase() const&
 	{
 		return static_cast<const crtp&>(*this).template to_lowercase<Allocator>(base_.get_allocator());
+	}
+
+	[[nodiscard]]
+	constexpr basic_utf16_string to_lowercase(size_type pos, size_type count) const&
+	{
+		return static_cast<const crtp&>(*this).template to_lowercase<Allocator>(pos, count, base_.get_allocator());
 	}
 
 	[[nodiscard]]
@@ -956,6 +1044,36 @@ public:
 		return static_cast<const crtp&>(*this).template to_lowercase<Allocator>(base_.get_allocator());
 	}
 
+	[[nodiscard]]
+	constexpr basic_utf16_string to_lowercase(size_type pos, size_type count) &&
+	{
+		if (pos > size()) [[unlikely]]
+		{
+			throw std::out_of_range("case transform index out of range");
+		}
+
+		const auto remaining = size() - pos;
+		const auto transform_count = count == npos ? remaining : count;
+		if (transform_count > remaining) [[unlikely]]
+		{
+			throw std::out_of_range("case transform count out of range");
+		}
+
+		const auto end = pos + transform_count;
+		if (!this->is_char_boundary(pos) || !this->is_char_boundary(end)) [[unlikely]]
+		{
+			throw std::out_of_range("case transform range must be a valid UTF-16 substring");
+		}
+
+		if (details::is_ascii_only(std::u16string_view{ base_.data() + pos, transform_count }))
+		{
+			details::ascii_lowercase_inplace(base_.data() + pos, transform_count);
+			return std::move(*this);
+		}
+
+		return static_cast<const crtp&>(*this).template to_lowercase<Allocator>(pos, count, base_.get_allocator());
+	}
+
 	template <typename OtherAllocator>
 	[[nodiscard]]
 	constexpr basic_utf16_string<OtherAllocator> to_lowercase(const OtherAllocator& alloc) const
@@ -963,10 +1081,26 @@ public:
 		return static_cast<const crtp&>(*this).template to_lowercase<OtherAllocator>(alloc);
 	}
 
+	template <typename OtherAllocator>
+	[[nodiscard]]
+	constexpr basic_utf16_string<OtherAllocator> to_lowercase(
+		size_type pos,
+		size_type count,
+		const OtherAllocator& alloc) const
+	{
+		return static_cast<const crtp&>(*this).template to_lowercase<OtherAllocator>(pos, count, alloc);
+	}
+
 	[[nodiscard]]
 	constexpr basic_utf16_string to_uppercase() const&
 	{
 		return static_cast<const crtp&>(*this).template to_uppercase<Allocator>(base_.get_allocator());
+	}
+
+	[[nodiscard]]
+	constexpr basic_utf16_string to_uppercase(size_type pos, size_type count) const&
+	{
+		return static_cast<const crtp&>(*this).template to_uppercase<Allocator>(pos, count, base_.get_allocator());
 	}
 
 	[[nodiscard]]
@@ -981,11 +1115,51 @@ public:
 		return static_cast<const crtp&>(*this).template to_uppercase<Allocator>(base_.get_allocator());
 	}
 
+	[[nodiscard]]
+	constexpr basic_utf16_string to_uppercase(size_type pos, size_type count) &&
+	{
+		if (pos > size()) [[unlikely]]
+		{
+			throw std::out_of_range("case transform index out of range");
+		}
+
+		const auto remaining = size() - pos;
+		const auto transform_count = count == npos ? remaining : count;
+		if (transform_count > remaining) [[unlikely]]
+		{
+			throw std::out_of_range("case transform count out of range");
+		}
+
+		const auto end = pos + transform_count;
+		if (!this->is_char_boundary(pos) || !this->is_char_boundary(end)) [[unlikely]]
+		{
+			throw std::out_of_range("case transform range must be a valid UTF-16 substring");
+		}
+
+		if (details::is_ascii_only(std::u16string_view{ base_.data() + pos, transform_count }))
+		{
+			details::ascii_uppercase_inplace(base_.data() + pos, transform_count);
+			return std::move(*this);
+		}
+
+		return static_cast<const crtp&>(*this).template to_uppercase<Allocator>(pos, count, base_.get_allocator());
+	}
+
 	template <typename OtherAllocator>
 	[[nodiscard]]
 	constexpr basic_utf16_string<OtherAllocator> to_uppercase(const OtherAllocator& alloc) const
 	{
 		return static_cast<const crtp&>(*this).template to_uppercase<OtherAllocator>(alloc);
+	}
+
+	template <typename OtherAllocator>
+	[[nodiscard]]
+	constexpr basic_utf16_string<OtherAllocator> to_uppercase(
+		size_type pos,
+		size_type count,
+		const OtherAllocator& alloc) const
+	{
+		return static_cast<const crtp&>(*this).template to_uppercase<OtherAllocator>(pos, count, alloc);
 	}
 
 	[[nodiscard]]

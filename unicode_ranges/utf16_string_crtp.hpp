@@ -2884,11 +2884,31 @@ public:
 	template <typename Allocator = std::allocator<char16_t>>
 	constexpr basic_utf16_string<Allocator> to_ascii_lowercase(const Allocator& alloc = Allocator()) const;
 	template <typename Allocator = std::allocator<char16_t>>
+	constexpr basic_utf16_string<Allocator> to_ascii_lowercase(
+		size_type pos,
+		size_type count,
+		const Allocator& alloc = Allocator()) const;
+	template <typename Allocator = std::allocator<char16_t>>
 	constexpr basic_utf16_string<Allocator> to_ascii_uppercase(const Allocator& alloc = Allocator()) const;
+	template <typename Allocator = std::allocator<char16_t>>
+	constexpr basic_utf16_string<Allocator> to_ascii_uppercase(
+		size_type pos,
+		size_type count,
+		const Allocator& alloc = Allocator()) const;
 	template <typename Allocator = std::allocator<char16_t>>
 	constexpr basic_utf16_string<Allocator> to_lowercase(const Allocator& alloc = Allocator()) const;
 	template <typename Allocator = std::allocator<char16_t>>
+	constexpr basic_utf16_string<Allocator> to_lowercase(
+		size_type pos,
+		size_type count,
+		const Allocator& alloc = Allocator()) const;
+	template <typename Allocator = std::allocator<char16_t>>
 	constexpr basic_utf16_string<Allocator> to_uppercase(const Allocator& alloc = Allocator()) const;
+	template <typename Allocator = std::allocator<char16_t>>
+	constexpr basic_utf16_string<Allocator> to_uppercase(
+		size_type pos,
+		size_type count,
+		const Allocator& alloc = Allocator()) const;
 	template <typename Allocator = std::allocator<char8_t>>
 	constexpr basic_utf8_string<Allocator> to_utf8(const Allocator& alloc = Allocator()) const;
 

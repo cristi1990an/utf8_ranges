@@ -1111,13 +1111,25 @@ public:
         to_ascii_lowercase(const Allocator& alloc = Allocator()) const;
     template<class Allocator = std::allocator<char8_t>>
     constexpr basic_utf8_string<Allocator>
+        to_ascii_lowercase(size_type pos, size_type count, const Allocator& alloc = Allocator()) const;
+    template<class Allocator = std::allocator<char8_t>>
+    constexpr basic_utf8_string<Allocator>
         to_ascii_uppercase(const Allocator& alloc = Allocator()) const;
+    template<class Allocator = std::allocator<char8_t>>
+    constexpr basic_utf8_string<Allocator>
+        to_ascii_uppercase(size_type pos, size_type count, const Allocator& alloc = Allocator()) const;
     template<class Allocator = std::allocator<char8_t>>
     constexpr basic_utf8_string<Allocator>
         to_lowercase(const Allocator& alloc = Allocator()) const;
     template<class Allocator = std::allocator<char8_t>>
     constexpr basic_utf8_string<Allocator>
+        to_lowercase(size_type pos, size_type count, const Allocator& alloc = Allocator()) const;
+    template<class Allocator = std::allocator<char8_t>>
+    constexpr basic_utf8_string<Allocator>
         to_uppercase(const Allocator& alloc = Allocator()) const;
+    template<class Allocator = std::allocator<char8_t>>
+    constexpr basic_utf8_string<Allocator>
+        to_uppercase(size_type pos, size_type count, const Allocator& alloc = Allocator()) const;
     constexpr utf8_string replace_all(utf8_char from, utf8_char to) const;
     constexpr utf8_string replace_all(utf8_char from, utf8_string_view to) const;
     constexpr utf8_string replace_all(utf8_string_view from, utf8_char to) const;
@@ -2307,13 +2319,25 @@ constexpr basic_utf8_string<Allocator>
     to_ascii_lowercase(const Allocator& alloc = Allocator()) const;
 template<class Allocator = std::allocator<char8_t>>
 constexpr basic_utf8_string<Allocator>
+    to_ascii_lowercase(size_type pos, size_type count, const Allocator& alloc = Allocator()) const;
+template<class Allocator = std::allocator<char8_t>>
+constexpr basic_utf8_string<Allocator>
     to_ascii_uppercase(const Allocator& alloc = Allocator()) const;
+template<class Allocator = std::allocator<char8_t>>
+constexpr basic_utf8_string<Allocator>
+    to_ascii_uppercase(size_type pos, size_type count, const Allocator& alloc = Allocator()) const;
 template<class Allocator = std::allocator<char8_t>>
 constexpr basic_utf8_string<Allocator>
     to_lowercase(const Allocator& alloc = Allocator()) const;
 template<class Allocator = std::allocator<char8_t>>
 constexpr basic_utf8_string<Allocator>
+    to_lowercase(size_type pos, size_type count, const Allocator& alloc = Allocator()) const;
+template<class Allocator = std::allocator<char8_t>>
+constexpr basic_utf8_string<Allocator>
     to_uppercase(const Allocator& alloc = Allocator()) const;
+template<class Allocator = std::allocator<char8_t>>
+constexpr basic_utf8_string<Allocator>
+    to_uppercase(size_type pos, size_type count, const Allocator& alloc = Allocator()) const;
 ```
 
 Return an owning UTF-8 string with Unicode case conversion applied.
@@ -2322,6 +2346,9 @@ Return an owning UTF-8 string with Unicode case conversion applied.
 - `to_lowercase` and `to_uppercase` use Unicode case mappings and may expand the output.
 - Non-ASCII characters are left untouched by the ASCII-only methods.
 - The full Unicode methods are locale-independent.
+- The `pos, count` overloads transform only the selected substring.
+- Pass `npos` explicitly as `count` to transform from `pos` to the end.
+- `pos` and `pos + count` must be valid UTF-8 character boundaries; otherwise the partial overloads throw `std::out_of_range`.
 
 Examples:
 
@@ -2330,6 +2357,7 @@ assert(u8"AbC-éß"_utf8_sv.to_ascii_lowercase() == u8"abc-éß"_utf8_s);
 assert(u8"aBc-éß"_utf8_sv.to_ascii_uppercase() == u8"ABC-éß"_utf8_s);
 assert(u8"ÄΩİ"_utf8_sv.to_lowercase() == u8"äωi̇"_utf8_s);
 assert(u8"äßω"_utf8_sv.to_uppercase() == u8"ÄSSΩ"_utf8_s);
+assert(u8"abäßcd"_utf8_sv.to_uppercase(2, 4) == u8"abÄSScd"_utf8_s);
 ```
 - Linear in `sv.size()` for `utf8_string_view`
 
@@ -2575,13 +2603,25 @@ public:
         to_ascii_lowercase(const Allocator& alloc = Allocator()) const;
     template<class Allocator = std::allocator<char16_t>>
     constexpr basic_utf16_string<Allocator>
+        to_ascii_lowercase(size_type pos, size_type count, const Allocator& alloc = Allocator()) const;
+    template<class Allocator = std::allocator<char16_t>>
+    constexpr basic_utf16_string<Allocator>
         to_ascii_uppercase(const Allocator& alloc = Allocator()) const;
+    template<class Allocator = std::allocator<char16_t>>
+    constexpr basic_utf16_string<Allocator>
+        to_ascii_uppercase(size_type pos, size_type count, const Allocator& alloc = Allocator()) const;
     template<class Allocator = std::allocator<char16_t>>
     constexpr basic_utf16_string<Allocator>
         to_lowercase(const Allocator& alloc = Allocator()) const;
     template<class Allocator = std::allocator<char16_t>>
     constexpr basic_utf16_string<Allocator>
+        to_lowercase(size_type pos, size_type count, const Allocator& alloc = Allocator()) const;
+    template<class Allocator = std::allocator<char16_t>>
+    constexpr basic_utf16_string<Allocator>
         to_uppercase(const Allocator& alloc = Allocator()) const;
+    template<class Allocator = std::allocator<char16_t>>
+    constexpr basic_utf16_string<Allocator>
+        to_uppercase(size_type pos, size_type count, const Allocator& alloc = Allocator()) const;
     constexpr size_type ceil_char_boundary(size_type pos) const noexcept;
     constexpr size_type floor_char_boundary(size_type pos) const noexcept;
     constexpr size_type ceil_grapheme_boundary(size_type pos) const noexcept;
@@ -2637,6 +2677,55 @@ static_assert(text.char_count() == 3);
 `find_grapheme`, `rfind_grapheme`, and `contains_grapheme` search using grapheme-cluster boundaries rather than only character boundaries. `find_first_of`, `find_first_not_of`, `find_last_of`, and `find_last_not_of` use raw code-unit semantics for `char16_t`, and UTF-16 character semantics for `utf16_char` and `utf16_string_view`.
 
 `find` and `rfind` behave like the UTF-8 variants, but with UTF-16 code-unit indexing and surrogate-pair boundaries.
+
+#### `to_ascii_lowercase`, `to_ascii_uppercase`, `to_lowercase`, `to_uppercase`
+
+```cpp
+template<class Allocator = std::allocator<char16_t>>
+constexpr basic_utf16_string<Allocator>
+    to_ascii_lowercase(const Allocator& alloc = Allocator()) const;
+template<class Allocator = std::allocator<char16_t>>
+constexpr basic_utf16_string<Allocator>
+    to_ascii_lowercase(size_type pos, size_type count, const Allocator& alloc = Allocator()) const;
+template<class Allocator = std::allocator<char16_t>>
+constexpr basic_utf16_string<Allocator>
+    to_ascii_uppercase(const Allocator& alloc = Allocator()) const;
+template<class Allocator = std::allocator<char16_t>>
+constexpr basic_utf16_string<Allocator>
+    to_ascii_uppercase(size_type pos, size_type count, const Allocator& alloc = Allocator()) const;
+template<class Allocator = std::allocator<char16_t>>
+constexpr basic_utf16_string<Allocator>
+    to_lowercase(const Allocator& alloc = Allocator()) const;
+template<class Allocator = std::allocator<char16_t>>
+constexpr basic_utf16_string<Allocator>
+    to_lowercase(size_type pos, size_type count, const Allocator& alloc = Allocator()) const;
+template<class Allocator = std::allocator<char16_t>>
+constexpr basic_utf16_string<Allocator>
+    to_uppercase(const Allocator& alloc = Allocator()) const;
+template<class Allocator = std::allocator<char16_t>>
+constexpr basic_utf16_string<Allocator>
+    to_uppercase(size_type pos, size_type count, const Allocator& alloc = Allocator()) const;
+```
+
+Returns a new UTF-16 owning string with ASCII-only or full Unicode case conversion applied.
+
+- The `ascii` variants change only ASCII letters.
+- The non-ASCII variants use Unicode case mapping and may change the output length.
+- The `pos, count` overloads transform only the selected substring.
+- Pass `npos` explicitly as `count` to transform from `pos` to the end.
+- `pos` and `pos + count` must be valid UTF-16 character boundaries; otherwise the partial overloads throw `std::out_of_range`.
+
+Examples:
+
+```cpp
+assert(u"AbC-éß"_utf16_sv.to_ascii_lowercase() == u"abc-éß"_utf16_s);
+assert(u"aBc-éß"_utf16_sv.to_ascii_uppercase() == u"ABC-éß"_utf16_s);
+assert(u"ÄΩİ"_utf16_sv.to_lowercase() == u"äωi̇"_utf16_s);
+assert(u"äßω"_utf16_sv.to_uppercase() == u"ÄSSΩ"_utf16_s);
+assert(u"abäßcd"_utf16_sv.to_uppercase(2, 2) == u"abÄSScd"_utf16_s);
+```
+
+- Linear in `sv.size()` for `utf16_string_view`
 
 #### `split`
 
@@ -3231,13 +3320,21 @@ constexpr basic_utf16_string replace_n(std::size_t count, utf16_char from, utf16
 constexpr basic_utf16_string replace_n(std::size_t count, utf16_string_view from, utf16_char to) &&;
 constexpr basic_utf16_string replace_n(std::size_t count, utf16_string_view from, utf16_string_view to) &&;
 constexpr basic_utf16_string to_ascii_lowercase() const&;
+constexpr basic_utf16_string to_ascii_lowercase(size_type pos, size_type count) const&;
 constexpr basic_utf16_string to_ascii_lowercase() &&;
+constexpr basic_utf16_string to_ascii_lowercase(size_type pos, size_type count) &&;
 constexpr basic_utf16_string to_ascii_uppercase() const&;
+constexpr basic_utf16_string to_ascii_uppercase(size_type pos, size_type count) const&;
 constexpr basic_utf16_string to_ascii_uppercase() &&;
+constexpr basic_utf16_string to_ascii_uppercase(size_type pos, size_type count) &&;
 constexpr basic_utf16_string to_lowercase() const&;
+constexpr basic_utf16_string to_lowercase(size_type pos, size_type count) const&;
 constexpr basic_utf16_string to_lowercase() &&;
+constexpr basic_utf16_string to_lowercase(size_type pos, size_type count) &&;
 constexpr basic_utf16_string to_uppercase() const&;
+constexpr basic_utf16_string to_uppercase(size_type pos, size_type count) const&;
 constexpr basic_utf16_string to_uppercase() &&;
+constexpr basic_utf16_string to_uppercase(size_type pos, size_type count) &&;
 ```
 
 Returns a new owning string after replacing non-overlapping matches of `from`.
@@ -3247,6 +3344,7 @@ Returns a new owning string after replacing non-overlapping matches of `from`.
 - empty `from` is a no-op
 - `const&` overloads leave the source string unchanged
 - `&&` overloads return the current owning string and may reuse storage when profitable
+- the partial `to_*case(pos, count)` overloads transform only the selected subrange and throw on invalid bounds
 
 Complexity: linear in `size() + replacement_size * replaced_count`.
 
@@ -3394,13 +3492,21 @@ public:
     constexpr basic_utf8_string replace_n(std::size_t count, utf8_string_view from, utf8_char to) &&;
     constexpr basic_utf8_string replace_n(std::size_t count, utf8_string_view from, utf8_string_view to) &&;
     constexpr basic_utf8_string to_ascii_lowercase() const&;
+    constexpr basic_utf8_string to_ascii_lowercase(size_type pos, size_type count) const&;
     constexpr basic_utf8_string to_ascii_lowercase() &&;
+    constexpr basic_utf8_string to_ascii_lowercase(size_type pos, size_type count) &&;
     constexpr basic_utf8_string to_ascii_uppercase() const&;
+    constexpr basic_utf8_string to_ascii_uppercase(size_type pos, size_type count) const&;
     constexpr basic_utf8_string to_ascii_uppercase() &&;
+    constexpr basic_utf8_string to_ascii_uppercase(size_type pos, size_type count) &&;
     constexpr basic_utf8_string to_lowercase() const&;
+    constexpr basic_utf8_string to_lowercase(size_type pos, size_type count) const&;
     constexpr basic_utf8_string to_lowercase() &&;
+    constexpr basic_utf8_string to_lowercase(size_type pos, size_type count) &&;
     constexpr basic_utf8_string to_uppercase() const&;
+    constexpr basic_utf8_string to_uppercase(size_type pos, size_type count) const&;
     constexpr basic_utf8_string to_uppercase() &&;
+    constexpr basic_utf8_string to_uppercase(size_type pos, size_type count) &&;
     constexpr void reserve(std::size_t new_cap);
     constexpr auto base() const& noexcept;
     constexpr auto base() && noexcept;

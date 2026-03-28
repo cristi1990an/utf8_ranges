@@ -273,16 +273,43 @@ namespace unicode_ranges
 		}
 	}
 
+	struct case_mapping_lookup_result
+	{
+		bool has_simple = false;
+		std::uint32_t simple_mapped = 0;
+		const unicode::unicode_special_case_mapping* special = nullptr;
+	};
+
 	template <bool Lowercase>
-	inline constexpr const unicode::unicode_case_mapping* lookup_case_mapping(std::uint32_t scalar) noexcept
+	inline constexpr case_mapping_lookup_result lookup_case_mapping(std::uint32_t scalar) noexcept
 	{
 		if constexpr (Lowercase)
 		{
-			return unicode::lowercase_mapping(scalar);
+			if (const auto* mapping = unicode::lowercase_simple_mapping(scalar); mapping != nullptr)
+			{
+				return case_mapping_lookup_result{
+					.has_simple = true,
+					.simple_mapped = mapping->mapped
+				};
+			}
+
+			return case_mapping_lookup_result{
+				.special = unicode::lowercase_special_mapping(scalar)
+			};
 		}
 		else
 		{
-			return unicode::uppercase_mapping(scalar);
+			if (const auto* mapping = unicode::uppercase_simple_mapping(scalar); mapping != nullptr)
+			{
+				return case_mapping_lookup_result{
+					.has_simple = true,
+					.simple_mapped = mapping->mapped
+				};
+			}
+
+			return case_mapping_lookup_result{
+				.special = unicode::uppercase_special_mapping(scalar)
+			};
 		}
 	}
 
@@ -314,12 +341,18 @@ namespace unicode_ranges
 			}
 
 			const auto decoded = decode_next_scalar(bytes, index);
-			if (const auto* mapping = lookup_case_mapping<Lowercase>(decoded.scalar); mapping != nullptr)
+			const auto mapping = lookup_case_mapping<Lowercase>(decoded.scalar);
+			if (mapping.has_simple)
 			{
 				result.changed = true;
-				for (std::size_t mapped_index = 0; mapped_index != mapping->count; ++mapped_index)
+				result.output_size += unicode_scalar_utf8_size(mapping.simple_mapped);
+			}
+			else if (mapping.special != nullptr)
+			{
+				result.changed = true;
+				for (std::size_t mapped_index = 0; mapped_index != mapping.special->count; ++mapped_index)
 				{
-					result.output_size += unicode_scalar_utf8_size(mapping->mapped[mapped_index]);
+					result.output_size += unicode_scalar_utf8_size(mapping.special->mapped[mapped_index]);
 				}
 			}
 			else
@@ -355,12 +388,18 @@ namespace unicode_ranges
 			}
 
 			const auto decoded = decode_next_scalar(code_units, index);
-			if (const auto* mapping = lookup_case_mapping<Lowercase>(decoded.scalar); mapping != nullptr)
+			const auto mapping = lookup_case_mapping<Lowercase>(decoded.scalar);
+			if (mapping.has_simple)
 			{
 				result.changed = true;
-				for (std::size_t mapped_index = 0; mapped_index != mapping->count; ++mapped_index)
+				result.output_size += unicode_scalar_utf16_size(mapping.simple_mapped);
+			}
+			else if (mapping.special != nullptr)
+			{
+				result.changed = true;
+				for (std::size_t mapped_index = 0; mapped_index != mapping.special->count; ++mapped_index)
 				{
-					result.output_size += unicode_scalar_utf16_size(mapping->mapped[mapped_index]);
+					result.output_size += unicode_scalar_utf16_size(mapping.special->mapped[mapped_index]);
 				}
 			}
 			else
@@ -374,6 +413,192 @@ namespace unicode_ranges
 		return result;
 	}
 
+	struct utf8_case_transform_parts
+	{
+		std::u8string_view prefix;
+		std::u8string_view middle;
+		std::u8string_view suffix;
+	};
+
+	struct utf16_case_transform_parts
+	{
+		std::u16string_view prefix;
+		std::u16string_view middle;
+		std::u16string_view suffix;
+	};
+
+	template <typename Derived, typename View>
+	constexpr utf8_case_transform_parts checked_utf8_case_transform_parts(
+		const utf8_string_crtp<Derived, View>& self,
+		typename utf8_string_crtp<Derived, View>::size_type pos,
+		typename utf8_string_crtp<Derived, View>::size_type count)
+	{
+		const auto bytes = std::u8string_view{ static_cast<const Derived&>(self).base() };
+		if (pos > bytes.size()) [[unlikely]]
+		{
+			throw std::out_of_range("case transform index out of range");
+		}
+
+		const auto remaining = bytes.size() - pos;
+		const auto transform_count = count == utf8_string_crtp<Derived, View>::npos ? remaining : count;
+		if (transform_count > remaining) [[unlikely]]
+		{
+			throw std::out_of_range("case transform count out of range");
+		}
+
+		const auto end = pos + transform_count;
+		if (!self.is_char_boundary(pos) || !self.is_char_boundary(end)) [[unlikely]]
+		{
+			throw std::out_of_range("case transform range must be a valid UTF-8 substring");
+		}
+
+		return utf8_case_transform_parts{
+			bytes.substr(0, pos),
+			bytes.substr(pos, transform_count),
+			bytes.substr(end)
+		};
+	}
+
+	template <typename Derived, typename View>
+	constexpr utf16_case_transform_parts checked_utf16_case_transform_parts(
+		const utf16_string_crtp<Derived, View>& self,
+		typename utf16_string_crtp<Derived, View>::size_type pos,
+		typename utf16_string_crtp<Derived, View>::size_type count)
+	{
+		const auto code_units = std::u16string_view{ static_cast<const Derived&>(self).base() };
+		if (pos > code_units.size()) [[unlikely]]
+		{
+			throw std::out_of_range("case transform index out of range");
+		}
+
+		const auto remaining = code_units.size() - pos;
+		const auto transform_count = count == utf16_string_crtp<Derived, View>::npos ? remaining : count;
+		if (transform_count > remaining) [[unlikely]]
+		{
+			throw std::out_of_range("case transform count out of range");
+		}
+
+		const auto end = pos + transform_count;
+		if (!self.is_char_boundary(pos) || !self.is_char_boundary(end)) [[unlikely]]
+		{
+			throw std::out_of_range("case transform range must be a valid UTF-16 substring");
+		}
+
+		return utf16_case_transform_parts{
+			code_units.substr(0, pos),
+			code_units.substr(pos, transform_count),
+			code_units.substr(end)
+		};
+	}
+
+	template <bool Lowercase>
+	constexpr std::size_t write_case_map_utf8_into(std::u8string_view bytes, char8_t* buffer) noexcept
+	{
+		std::size_t write_index = 0;
+		for (std::size_t index = 0; index < bytes.size();)
+		{
+			const auto remaining = std::u8string_view{ bytes.data() + index, bytes.size() - index };
+			const auto ascii_run = ascii_prefix_length(remaining);
+			if (ascii_run != 0)
+			{
+				if constexpr (Lowercase)
+				{
+					ascii_lowercase_copy(buffer + write_index, remaining.substr(0, ascii_run));
+				}
+				else
+				{
+					ascii_uppercase_copy(buffer + write_index, remaining.substr(0, ascii_run));
+				}
+
+				write_index += ascii_run;
+				index += ascii_run;
+				continue;
+			}
+
+			const auto decoded = decode_next_scalar(bytes, index);
+			const auto mapping = lookup_case_mapping<Lowercase>(decoded.scalar);
+			if (mapping.has_simple)
+			{
+				write_index += encode_unicode_scalar_utf8_unchecked(mapping.simple_mapped, buffer + write_index);
+			}
+			else if (mapping.special != nullptr)
+			{
+				for (std::size_t mapped_index = 0; mapped_index != mapping.special->count; ++mapped_index)
+				{
+					write_index += encode_unicode_scalar_utf8_unchecked(
+						mapping.special->mapped[mapped_index],
+						buffer + write_index);
+				}
+			}
+			else
+			{
+				std::char_traits<char8_t>::copy(
+					buffer + write_index,
+					bytes.data() + index,
+					decoded.next_index - index);
+				write_index += decoded.next_index - index;
+			}
+
+			index = decoded.next_index;
+		}
+
+		return write_index;
+	}
+
+	template <bool Lowercase>
+	constexpr std::size_t write_case_map_utf16_into(std::u16string_view code_units, char16_t* buffer) noexcept
+	{
+		std::size_t write_index = 0;
+		for (std::size_t index = 0; index < code_units.size();)
+		{
+			const auto remaining = std::u16string_view{ code_units.data() + index, code_units.size() - index };
+			const auto ascii_run = ascii_prefix_length(remaining);
+			if (ascii_run != 0)
+			{
+				if constexpr (Lowercase)
+				{
+					ascii_lowercase_copy(buffer + write_index, remaining.substr(0, ascii_run));
+				}
+				else
+				{
+					ascii_uppercase_copy(buffer + write_index, remaining.substr(0, ascii_run));
+				}
+
+				write_index += ascii_run;
+				index += ascii_run;
+				continue;
+			}
+
+			const auto decoded = decode_next_scalar(code_units, index);
+			const auto mapping = lookup_case_mapping<Lowercase>(decoded.scalar);
+			if (mapping.has_simple)
+			{
+				write_index += encode_unicode_scalar_utf16_unchecked(mapping.simple_mapped, buffer + write_index);
+			}
+			else if (mapping.special != nullptr)
+			{
+				for (std::size_t mapped_index = 0; mapped_index != mapping.special->count; ++mapped_index)
+				{
+					write_index += encode_unicode_scalar_utf16_unchecked(
+						mapping.special->mapped[mapped_index],
+						buffer + write_index);
+				}
+			}
+			else
+			{
+				std::char_traits<char16_t>::copy(
+					buffer + write_index,
+					code_units.data() + index,
+					decoded.next_index - index);
+				write_index += decoded.next_index - index;
+			}
+
+			index = decoded.next_index;
+		}
+
+		return write_index;
+	}
+
 	template <bool Lowercase, typename BaseType>
 	constexpr void write_case_map_utf8(
 		std::u8string_view bytes,
@@ -383,50 +608,7 @@ namespace unicode_ranges
 		result.resize_and_overwrite(output_size,
 			[&](char8_t* buffer, std::size_t) noexcept
 			{
-				std::size_t write_index = 0;
-				for (std::size_t index = 0; index < bytes.size();)
-				{
-					const auto remaining = std::u8string_view{ bytes.data() + index, bytes.size() - index };
-					const auto ascii_run = ascii_prefix_length(remaining);
-					if (ascii_run != 0)
-					{
-						if constexpr (Lowercase)
-						{
-							ascii_lowercase_copy(buffer + write_index, remaining.substr(0, ascii_run));
-						}
-						else
-						{
-							ascii_uppercase_copy(buffer + write_index, remaining.substr(0, ascii_run));
-						}
-
-						write_index += ascii_run;
-						index += ascii_run;
-						continue;
-					}
-
-					const auto decoded = decode_next_scalar(bytes, index);
-					if (const auto* mapping = lookup_case_mapping<Lowercase>(decoded.scalar); mapping != nullptr)
-					{
-						for (std::size_t mapped_index = 0; mapped_index != mapping->count; ++mapped_index)
-						{
-							write_index += encode_unicode_scalar_utf8_unchecked(
-								mapping->mapped[mapped_index],
-								buffer + write_index);
-						}
-					}
-					else
-					{
-						std::char_traits<char8_t>::copy(
-							buffer + write_index,
-							bytes.data() + index,
-							decoded.next_index - index);
-						write_index += decoded.next_index - index;
-					}
-
-					index = decoded.next_index;
-				}
-
-				return write_index;
+				return write_case_map_utf8_into<Lowercase>(bytes, buffer);
 			});
 	}
 
@@ -439,50 +621,7 @@ namespace unicode_ranges
 		result.resize_and_overwrite(output_size,
 			[&](char16_t* buffer, std::size_t) noexcept
 			{
-				std::size_t write_index = 0;
-				for (std::size_t index = 0; index < code_units.size();)
-				{
-					const auto remaining = std::u16string_view{ code_units.data() + index, code_units.size() - index };
-					const auto ascii_run = ascii_prefix_length(remaining);
-					if (ascii_run != 0)
-					{
-						if constexpr (Lowercase)
-						{
-							ascii_lowercase_copy(buffer + write_index, remaining.substr(0, ascii_run));
-						}
-						else
-						{
-							ascii_uppercase_copy(buffer + write_index, remaining.substr(0, ascii_run));
-						}
-
-						write_index += ascii_run;
-						index += ascii_run;
-						continue;
-					}
-
-					const auto decoded = decode_next_scalar(code_units, index);
-					if (const auto* mapping = lookup_case_mapping<Lowercase>(decoded.scalar); mapping != nullptr)
-					{
-						for (std::size_t mapped_index = 0; mapped_index != mapping->count; ++mapped_index)
-						{
-							write_index += encode_unicode_scalar_utf16_unchecked(
-								mapping->mapped[mapped_index],
-								buffer + write_index);
-						}
-					}
-					else
-					{
-						std::char_traits<char16_t>::copy(
-							buffer + write_index,
-							code_units.data() + index,
-							decoded.next_index - index);
-						write_index += decoded.next_index - index;
-					}
-
-					index = decoded.next_index;
-				}
-
-				return write_index;
+				return write_case_map_utf16_into<Lowercase>(code_units, buffer);
 			});
 	}
 
@@ -518,22 +657,21 @@ namespace unicode_ranges
 
 					const auto decoded = decode_next_scalar(bytes, index);
 					const auto input_size = decoded.next_index - index;
-					if (const auto* mapping = lookup_case_mapping<Lowercase>(decoded.scalar); mapping != nullptr)
+					const auto mapping = lookup_case_mapping<Lowercase>(decoded.scalar);
+					if (mapping.special != nullptr)
 					{
-						if (mapping->count != 1u)
+						same_size = false;
+						return write_index;
+					}
+					else if (mapping.has_simple)
+					{
+						if (unicode_scalar_utf8_size(mapping.simple_mapped) != input_size)
 						{
 							same_size = false;
 							return write_index;
 						}
 
-						const auto mapped = mapping->mapped[0];
-						if (unicode_scalar_utf8_size(mapped) != input_size)
-						{
-							same_size = false;
-							return write_index;
-						}
-
-						write_index += encode_unicode_scalar_utf8_unchecked(mapped, buffer + write_index);
+						write_index += encode_unicode_scalar_utf8_unchecked(mapping.simple_mapped, buffer + write_index);
 					}
 					else
 					{
@@ -582,22 +720,21 @@ namespace unicode_ranges
 
 					const auto decoded = decode_next_scalar(code_units, index);
 					const auto input_size = decoded.next_index - index;
-					if (const auto* mapping = lookup_case_mapping<Lowercase>(decoded.scalar); mapping != nullptr)
+					const auto mapping = lookup_case_mapping<Lowercase>(decoded.scalar);
+					if (mapping.special != nullptr)
 					{
-						if (mapping->count != 1u)
+						same_size = false;
+						return write_index;
+					}
+					else if (mapping.has_simple)
+					{
+						if (unicode_scalar_utf16_size(mapping.simple_mapped) != input_size)
 						{
 							same_size = false;
 							return write_index;
 						}
 
-						const auto mapped = mapping->mapped[0];
-						if (unicode_scalar_utf16_size(mapped) != input_size)
-						{
-							same_size = false;
-							return write_index;
-						}
-
-						write_index += encode_unicode_scalar_utf16_unchecked(mapped, buffer + write_index);
+						write_index += encode_unicode_scalar_utf16_unchecked(mapping.simple_mapped, buffer + write_index);
 					}
 					else
 					{
@@ -750,6 +887,38 @@ namespace unicode_ranges
 
 	template <typename Derived, typename View>
 	template <typename Allocator>
+	constexpr basic_utf8_string<Allocator> utf8_string_crtp<Derived, View>::to_ascii_lowercase(
+		size_type pos,
+		size_type count,
+		const Allocator& alloc) const
+	{
+		using base_type = typename basic_utf8_string<Allocator>::base_type;
+		const auto bytes = byte_view();
+		const auto parts = details::checked_utf8_case_transform_parts(*this, pos, count);
+		base_type result{ alloc };
+		result.resize_and_overwrite(bytes.size(),
+			[&](char8_t* buffer, std::size_t) noexcept
+			{
+				std::char_traits<char8_t>::copy(buffer, parts.prefix.data(), parts.prefix.size());
+				const auto changed = ascii_lowercase_copy(buffer + parts.prefix.size(), parts.middle);
+				std::char_traits<char8_t>::copy(
+					buffer + parts.prefix.size() + parts.middle.size(),
+					parts.suffix.data(),
+					parts.suffix.size());
+
+				if (!changed)
+				{
+					std::char_traits<char8_t>::copy(buffer + parts.prefix.size(), parts.middle.data(), parts.middle.size());
+				}
+
+				return bytes.size();
+			});
+
+		return basic_utf8_string<Allocator>::from_bytes_unchecked(std::move(result));
+	}
+
+	template <typename Derived, typename View>
+	template <typename Allocator>
 	constexpr basic_utf8_string<Allocator> utf8_string_crtp<Derived, View>::to_ascii_uppercase(const Allocator& alloc) const
 	{
 		using base_type = typename basic_utf8_string<Allocator>::base_type;
@@ -767,6 +936,38 @@ namespace unicode_ranges
 
 	template <typename Derived, typename View>
 	template <typename Allocator>
+	constexpr basic_utf8_string<Allocator> utf8_string_crtp<Derived, View>::to_ascii_uppercase(
+		size_type pos,
+		size_type count,
+		const Allocator& alloc) const
+	{
+		using base_type = typename basic_utf8_string<Allocator>::base_type;
+		const auto bytes = byte_view();
+		const auto parts = details::checked_utf8_case_transform_parts(*this, pos, count);
+		base_type result{ alloc };
+		result.resize_and_overwrite(bytes.size(),
+			[&](char8_t* buffer, std::size_t) noexcept
+			{
+				std::char_traits<char8_t>::copy(buffer, parts.prefix.data(), parts.prefix.size());
+				const auto changed = ascii_uppercase_copy(buffer + parts.prefix.size(), parts.middle);
+				std::char_traits<char8_t>::copy(
+					buffer + parts.prefix.size() + parts.middle.size(),
+					parts.suffix.data(),
+					parts.suffix.size());
+
+				if (!changed)
+				{
+					std::char_traits<char8_t>::copy(buffer + parts.prefix.size(), parts.middle.data(), parts.middle.size());
+				}
+
+				return bytes.size();
+			});
+
+		return basic_utf8_string<Allocator>::from_bytes_unchecked(std::move(result));
+	}
+
+	template <typename Derived, typename View>
+	template <typename Allocator>
 	constexpr basic_utf8_string<Allocator> utf8_string_crtp<Derived, View>::to_lowercase(const Allocator& alloc) const
 	{
 		return case_map_utf8_copy<true>(byte_view(), alloc);
@@ -774,9 +975,73 @@ namespace unicode_ranges
 
 	template <typename Derived, typename View>
 	template <typename Allocator>
+	constexpr basic_utf8_string<Allocator> utf8_string_crtp<Derived, View>::to_lowercase(
+		size_type pos,
+		size_type count,
+		const Allocator& alloc) const
+	{
+		using base_type = typename basic_utf8_string<Allocator>::base_type;
+		const auto bytes = byte_view();
+		const auto parts = details::checked_utf8_case_transform_parts(*this, pos, count);
+		const auto measurement = details::measure_case_map_utf8<true>(parts.middle);
+		if (!measurement.changed)
+		{
+			return basic_utf8_string<Allocator>::from_bytes_unchecked(base_type{ bytes, alloc });
+		}
+
+		const auto output_size = parts.prefix.size() + measurement.output_size + parts.suffix.size();
+		base_type result{ alloc };
+		result.resize_and_overwrite(output_size,
+			[&](char8_t* buffer, std::size_t) noexcept
+			{
+				std::char_traits<char8_t>::copy(buffer, parts.prefix.data(), parts.prefix.size());
+				auto write_index = parts.prefix.size();
+				write_index += details::write_case_map_utf8_into<true>(parts.middle, buffer + write_index);
+				std::char_traits<char8_t>::copy(buffer + write_index, parts.suffix.data(), parts.suffix.size());
+				write_index += parts.suffix.size();
+				return write_index;
+			});
+
+		return basic_utf8_string<Allocator>::from_bytes_unchecked(std::move(result));
+	}
+
+	template <typename Derived, typename View>
+	template <typename Allocator>
 	constexpr basic_utf8_string<Allocator> utf8_string_crtp<Derived, View>::to_uppercase(const Allocator& alloc) const
 	{
 		return case_map_utf8_copy<false>(byte_view(), alloc);
+	}
+
+	template <typename Derived, typename View>
+	template <typename Allocator>
+	constexpr basic_utf8_string<Allocator> utf8_string_crtp<Derived, View>::to_uppercase(
+		size_type pos,
+		size_type count,
+		const Allocator& alloc) const
+	{
+		using base_type = typename basic_utf8_string<Allocator>::base_type;
+		const auto bytes = byte_view();
+		const auto parts = details::checked_utf8_case_transform_parts(*this, pos, count);
+		const auto measurement = details::measure_case_map_utf8<false>(parts.middle);
+		if (!measurement.changed)
+		{
+			return basic_utf8_string<Allocator>::from_bytes_unchecked(base_type{ bytes, alloc });
+		}
+
+		const auto output_size = parts.prefix.size() + measurement.output_size + parts.suffix.size();
+		base_type result{ alloc };
+		result.resize_and_overwrite(output_size,
+			[&](char8_t* buffer, std::size_t) noexcept
+			{
+				std::char_traits<char8_t>::copy(buffer, parts.prefix.data(), parts.prefix.size());
+				auto write_index = parts.prefix.size();
+				write_index += details::write_case_map_utf8_into<false>(parts.middle, buffer + write_index);
+				std::char_traits<char8_t>::copy(buffer + write_index, parts.suffix.data(), parts.suffix.size());
+				write_index += parts.suffix.size();
+				return write_index;
+			});
+
+		return basic_utf8_string<Allocator>::from_bytes_unchecked(std::move(result));
 	}
 
 	template <typename Derived, typename View>
@@ -1187,6 +1452,38 @@ namespace unicode_ranges
 
 	template <typename Derived, typename View>
 	template <typename Allocator>
+	constexpr basic_utf16_string<Allocator> utf16_string_crtp<Derived, View>::to_ascii_lowercase(
+		size_type pos,
+		size_type count,
+		const Allocator& alloc) const
+	{
+		using base_type = typename basic_utf16_string<Allocator>::base_type;
+		const auto code_units = code_unit_view();
+		const auto parts = details::checked_utf16_case_transform_parts(*this, pos, count);
+		base_type result{ alloc };
+		result.resize_and_overwrite(code_units.size(),
+			[&](char16_t* buffer, std::size_t) noexcept
+			{
+				std::char_traits<char16_t>::copy(buffer, parts.prefix.data(), parts.prefix.size());
+				const auto changed = ascii_lowercase_copy(buffer + parts.prefix.size(), parts.middle);
+				std::char_traits<char16_t>::copy(
+					buffer + parts.prefix.size() + parts.middle.size(),
+					parts.suffix.data(),
+					parts.suffix.size());
+
+				if (!changed)
+				{
+					std::char_traits<char16_t>::copy(buffer + parts.prefix.size(), parts.middle.data(), parts.middle.size());
+				}
+
+				return code_units.size();
+			});
+
+		return basic_utf16_string<Allocator>::from_code_units_unchecked(std::move(result));
+	}
+
+	template <typename Derived, typename View>
+	template <typename Allocator>
 	constexpr basic_utf16_string<Allocator> utf16_string_crtp<Derived, View>::to_ascii_uppercase(const Allocator& alloc) const
 	{
 		using base_type = typename basic_utf16_string<Allocator>::base_type;
@@ -1204,6 +1501,38 @@ namespace unicode_ranges
 
 	template <typename Derived, typename View>
 	template <typename Allocator>
+	constexpr basic_utf16_string<Allocator> utf16_string_crtp<Derived, View>::to_ascii_uppercase(
+		size_type pos,
+		size_type count,
+		const Allocator& alloc) const
+	{
+		using base_type = typename basic_utf16_string<Allocator>::base_type;
+		const auto code_units = code_unit_view();
+		const auto parts = details::checked_utf16_case_transform_parts(*this, pos, count);
+		base_type result{ alloc };
+		result.resize_and_overwrite(code_units.size(),
+			[&](char16_t* buffer, std::size_t) noexcept
+			{
+				std::char_traits<char16_t>::copy(buffer, parts.prefix.data(), parts.prefix.size());
+				const auto changed = ascii_uppercase_copy(buffer + parts.prefix.size(), parts.middle);
+				std::char_traits<char16_t>::copy(
+					buffer + parts.prefix.size() + parts.middle.size(),
+					parts.suffix.data(),
+					parts.suffix.size());
+
+				if (!changed)
+				{
+					std::char_traits<char16_t>::copy(buffer + parts.prefix.size(), parts.middle.data(), parts.middle.size());
+				}
+
+				return code_units.size();
+			});
+
+		return basic_utf16_string<Allocator>::from_code_units_unchecked(std::move(result));
+	}
+
+	template <typename Derived, typename View>
+	template <typename Allocator>
 	constexpr basic_utf16_string<Allocator> utf16_string_crtp<Derived, View>::to_lowercase(const Allocator& alloc) const
 	{
 		return case_map_utf16_copy<true>(code_unit_view(), alloc);
@@ -1211,9 +1540,73 @@ namespace unicode_ranges
 
 	template <typename Derived, typename View>
 	template <typename Allocator>
+	constexpr basic_utf16_string<Allocator> utf16_string_crtp<Derived, View>::to_lowercase(
+		size_type pos,
+		size_type count,
+		const Allocator& alloc) const
+	{
+		using base_type = typename basic_utf16_string<Allocator>::base_type;
+		const auto code_units = code_unit_view();
+		const auto parts = details::checked_utf16_case_transform_parts(*this, pos, count);
+		const auto measurement = details::measure_case_map_utf16<true>(parts.middle);
+		if (!measurement.changed)
+		{
+			return basic_utf16_string<Allocator>::from_code_units_unchecked(base_type{ code_units, alloc });
+		}
+
+		const auto output_size = parts.prefix.size() + measurement.output_size + parts.suffix.size();
+		base_type result{ alloc };
+		result.resize_and_overwrite(output_size,
+			[&](char16_t* buffer, std::size_t) noexcept
+			{
+				std::char_traits<char16_t>::copy(buffer, parts.prefix.data(), parts.prefix.size());
+				auto write_index = parts.prefix.size();
+				write_index += details::write_case_map_utf16_into<true>(parts.middle, buffer + write_index);
+				std::char_traits<char16_t>::copy(buffer + write_index, parts.suffix.data(), parts.suffix.size());
+				write_index += parts.suffix.size();
+				return write_index;
+			});
+
+		return basic_utf16_string<Allocator>::from_code_units_unchecked(std::move(result));
+	}
+
+	template <typename Derived, typename View>
+	template <typename Allocator>
 	constexpr basic_utf16_string<Allocator> utf16_string_crtp<Derived, View>::to_uppercase(const Allocator& alloc) const
 	{
 		return case_map_utf16_copy<false>(code_unit_view(), alloc);
+	}
+
+	template <typename Derived, typename View>
+	template <typename Allocator>
+	constexpr basic_utf16_string<Allocator> utf16_string_crtp<Derived, View>::to_uppercase(
+		size_type pos,
+		size_type count,
+		const Allocator& alloc) const
+	{
+		using base_type = typename basic_utf16_string<Allocator>::base_type;
+		const auto code_units = code_unit_view();
+		const auto parts = details::checked_utf16_case_transform_parts(*this, pos, count);
+		const auto measurement = details::measure_case_map_utf16<false>(parts.middle);
+		if (!measurement.changed)
+		{
+			return basic_utf16_string<Allocator>::from_code_units_unchecked(base_type{ code_units, alloc });
+		}
+
+		const auto output_size = parts.prefix.size() + measurement.output_size + parts.suffix.size();
+		base_type result{ alloc };
+		result.resize_and_overwrite(output_size,
+			[&](char16_t* buffer, std::size_t) noexcept
+			{
+				std::char_traits<char16_t>::copy(buffer, parts.prefix.data(), parts.prefix.size());
+				auto write_index = parts.prefix.size();
+				write_index += details::write_case_map_utf16_into<false>(parts.middle, buffer + write_index);
+				std::char_traits<char16_t>::copy(buffer + write_index, parts.suffix.data(), parts.suffix.size());
+				write_index += parts.suffix.size();
+				return write_index;
+			});
+
+		return basic_utf16_string<Allocator>::from_code_units_unchecked(std::move(result));
 	}
 
 	template <typename Derived, typename View>

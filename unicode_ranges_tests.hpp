@@ -211,25 +211,45 @@ inline void run_unicode_ranges_tests()
 		decltype(utf8_string{}.replace_n(2, u8"\u00E9"_u8c, u8"!"_u8c, std::pmr::polymorphic_allocator<char8_t>{})),
 		pmr::utf8_string>);
 	static_assert(std::same_as<decltype(utf8_text.to_ascii_lowercase()), utf8_string>);
+	static_assert(std::same_as<decltype(utf8_text.to_ascii_lowercase(0, 1)), utf8_string>);
 	static_assert(std::same_as<
 		decltype(utf8_text.to_ascii_lowercase(std::pmr::polymorphic_allocator<char8_t>{})),
 		pmr::utf8_string>);
+	static_assert(std::same_as<
+		decltype(utf8_text.to_ascii_lowercase(0, 1, std::pmr::polymorphic_allocator<char8_t>{})),
+		pmr::utf8_string>);
 	static_assert(std::same_as<decltype(utf8_text.to_ascii_uppercase()), utf8_string>);
+	static_assert(std::same_as<decltype(utf8_text.to_ascii_uppercase(0, 1)), utf8_string>);
 	static_assert(std::same_as<
 		decltype(utf8_text.to_ascii_uppercase(std::pmr::polymorphic_allocator<char8_t>{})),
 		pmr::utf8_string>);
+	static_assert(std::same_as<
+		decltype(utf8_text.to_ascii_uppercase(0, 1, std::pmr::polymorphic_allocator<char8_t>{})),
+		pmr::utf8_string>);
 	static_assert(std::same_as<decltype(utf8_text.to_lowercase()), utf8_string>);
+	static_assert(std::same_as<decltype(utf8_text.to_lowercase(0, 1)), utf8_string>);
 	static_assert(std::same_as<
 		decltype(utf8_text.to_lowercase(std::pmr::polymorphic_allocator<char8_t>{})),
 		pmr::utf8_string>);
+	static_assert(std::same_as<
+		decltype(utf8_text.to_lowercase(0, 1, std::pmr::polymorphic_allocator<char8_t>{})),
+		pmr::utf8_string>);
 	static_assert(std::same_as<decltype(utf8_text.to_uppercase()), utf8_string>);
+	static_assert(std::same_as<decltype(utf8_text.to_uppercase(0, 1)), utf8_string>);
 	static_assert(std::same_as<
 		decltype(utf8_text.to_uppercase(std::pmr::polymorphic_allocator<char8_t>{})),
 		pmr::utf8_string>);
+	static_assert(std::same_as<
+		decltype(utf8_text.to_uppercase(0, 1, std::pmr::polymorphic_allocator<char8_t>{})),
+		pmr::utf8_string>);
 	static_assert(std::same_as<decltype(pmr::utf8_string{}.to_ascii_lowercase()), pmr::utf8_string>);
+	static_assert(std::same_as<decltype(pmr::utf8_string{}.to_ascii_lowercase(0, 0)), pmr::utf8_string>);
 	static_assert(std::same_as<decltype(pmr::utf8_string{}.to_ascii_uppercase()), pmr::utf8_string>);
+	static_assert(std::same_as<decltype(pmr::utf8_string{}.to_ascii_uppercase(0, 0)), pmr::utf8_string>);
 	static_assert(std::same_as<decltype(pmr::utf8_string{}.to_lowercase()), pmr::utf8_string>);
+	static_assert(std::same_as<decltype(pmr::utf8_string{}.to_lowercase(0, 0)), pmr::utf8_string>);
 	static_assert(std::same_as<decltype(pmr::utf8_string{}.to_uppercase()), pmr::utf8_string>);
+	static_assert(std::same_as<decltype(pmr::utf8_string{}.to_uppercase(0, 0)), pmr::utf8_string>);
 	static_assert(std::same_as<
 		decltype(utf8_text.rsplit_once(u8"\u00E9"_u8c)),
 		std::optional<std::pair<utf8_string_view, utf8_string_view>>>);
@@ -364,25 +384,45 @@ inline void run_unicode_ranges_tests()
 		decltype(utf16_string{}.replace_n(2, u"\u00E9"_u16c, u"!"_u16c, std::pmr::polymorphic_allocator<char16_t>{})),
 		pmr::utf16_string>);
 	static_assert(std::same_as<decltype(utf16_text.to_ascii_lowercase()), utf16_string>);
+	static_assert(std::same_as<decltype(utf16_text.to_ascii_lowercase(0, 1)), utf16_string>);
 	static_assert(std::same_as<
 		decltype(utf16_text.to_ascii_lowercase(std::pmr::polymorphic_allocator<char16_t>{})),
 		pmr::utf16_string>);
+	static_assert(std::same_as<
+		decltype(utf16_text.to_ascii_lowercase(0, 1, std::pmr::polymorphic_allocator<char16_t>{})),
+		pmr::utf16_string>);
 	static_assert(std::same_as<decltype(utf16_text.to_ascii_uppercase()), utf16_string>);
+	static_assert(std::same_as<decltype(utf16_text.to_ascii_uppercase(0, 1)), utf16_string>);
 	static_assert(std::same_as<
 		decltype(utf16_text.to_ascii_uppercase(std::pmr::polymorphic_allocator<char16_t>{})),
 		pmr::utf16_string>);
+	static_assert(std::same_as<
+		decltype(utf16_text.to_ascii_uppercase(0, 1, std::pmr::polymorphic_allocator<char16_t>{})),
+		pmr::utf16_string>);
 	static_assert(std::same_as<decltype(utf16_text.to_lowercase()), utf16_string>);
+	static_assert(std::same_as<decltype(utf16_text.to_lowercase(0, 1)), utf16_string>);
 	static_assert(std::same_as<
 		decltype(utf16_text.to_lowercase(std::pmr::polymorphic_allocator<char16_t>{})),
 		pmr::utf16_string>);
+	static_assert(std::same_as<
+		decltype(utf16_text.to_lowercase(0, 1, std::pmr::polymorphic_allocator<char16_t>{})),
+		pmr::utf16_string>);
 	static_assert(std::same_as<decltype(utf16_text.to_uppercase()), utf16_string>);
+	static_assert(std::same_as<decltype(utf16_text.to_uppercase(0, 1)), utf16_string>);
 	static_assert(std::same_as<
 		decltype(utf16_text.to_uppercase(std::pmr::polymorphic_allocator<char16_t>{})),
 		pmr::utf16_string>);
+	static_assert(std::same_as<
+		decltype(utf16_text.to_uppercase(0, 1, std::pmr::polymorphic_allocator<char16_t>{})),
+		pmr::utf16_string>);
 	static_assert(std::same_as<decltype(pmr::utf16_string{}.to_ascii_lowercase()), pmr::utf16_string>);
+	static_assert(std::same_as<decltype(pmr::utf16_string{}.to_ascii_lowercase(0, 0)), pmr::utf16_string>);
 	static_assert(std::same_as<decltype(pmr::utf16_string{}.to_ascii_uppercase()), pmr::utf16_string>);
+	static_assert(std::same_as<decltype(pmr::utf16_string{}.to_ascii_uppercase(0, 0)), pmr::utf16_string>);
 	static_assert(std::same_as<decltype(pmr::utf16_string{}.to_lowercase()), pmr::utf16_string>);
+	static_assert(std::same_as<decltype(pmr::utf16_string{}.to_lowercase(0, 0)), pmr::utf16_string>);
 	static_assert(std::same_as<decltype(pmr::utf16_string{}.to_uppercase()), pmr::utf16_string>);
+	static_assert(std::same_as<decltype(pmr::utf16_string{}.to_uppercase(0, 0)), pmr::utf16_string>);
 	static_assert(std::same_as<
 		decltype(utf16_text.rsplit_once(u"\u00E9"_u16c)),
 		std::optional<std::pair<utf16_string_view, utf16_string_view>>>);
@@ -1784,26 +1824,42 @@ inline void run_unicode_ranges_tests()
 		}
 		{
 			assert(u8"AbC-\u00E9\u00DF"_utf8_sv.to_ascii_lowercase() == u8"abc-\u00E9\u00DF"_utf8_sv);
+			assert(u8"AbC-\u00E9\u00DF"_utf8_sv.to_ascii_lowercase(0, 3) == u8"abc-\u00E9\u00DF"_utf8_sv);
 			assert(u8"aBc-\u00E9\u00DF"_utf8_sv.to_ascii_uppercase() == u8"ABC-\u00E9\u00DF"_utf8_sv);
+			assert(u8"aBc-\u00E9\u00DF"_utf8_sv.to_ascii_uppercase(0, 3) == u8"ABC-\u00E9\u00DF"_utf8_sv);
 			assert(u8"\u00C4\u03A9\u0130"_utf8_sv.to_lowercase() == u8"\u00E4\u03C9i\u0307"_utf8_sv);
+			assert(u8"XX\u00C4\u03A9YY"_utf8_sv.to_lowercase(2, 4) == u8"XX\u00E4\u03C9YY"_utf8_sv);
 			assert(u8"\u00E4\u00DF\u03C9"_utf8_sv.to_uppercase() == u8"\u00C4SS\u03A9"_utf8_sv);
+			assert(u8"ab\u00E4\u00DFcd"_utf8_sv.to_uppercase(2, 4) == u8"ab\u00C4SScd"_utf8_sv);
 			[[maybe_unused]] auto ascii_lowered_owned = utf8_string{ u8"AbC-\u00E9\u00DF"_utf8_sv }.to_ascii_lowercase();
 			assert(ascii_lowered_owned == u8"abc-\u00E9\u00DF"_utf8_sv);
+			auto partial_ascii_lower_owned = u8"AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-\u00E9\u00DF"_utf8_s;
+			[[maybe_unused]] auto partial_ascii_lowered = std::move(partial_ascii_lower_owned).to_ascii_lowercase(0, 26);
+			assert(partial_ascii_lowered == u8"abcdefghijklmnopqrstuvwxyz0123456789-\u00E9\u00DF"_utf8_sv);
 			auto ascii_lower_owned = u8"AbCdEfGhIjKlMnOpQrStUvWxYz0123456789AbCdEfGhIjKlMnOpQrSt"_utf8_s;
 			[[maybe_unused]] const auto* ascii_lower_original = ascii_lower_owned.base().data();
 			[[maybe_unused]] auto lowered_in_place = std::move(ascii_lower_owned).to_lowercase();
 			assert(lowered_in_place == u8"abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrst"_utf8_sv);
 			assert(lowered_in_place.base().data() == ascii_lower_original);
+			auto partial_lower_owned = u8"XX\u00C4\u03A9YY"_utf8_s;
+			[[maybe_unused]] auto partial_lowered = std::move(partial_lower_owned).to_lowercase(2, 4);
+			assert(partial_lowered == u8"XX\u00E4\u03C9YY"_utf8_sv);
 			auto ascii_upper_owned = u8"aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789aBcDeFgHiJkLmNoPqRsT"_utf8_s;
 			[[maybe_unused]] const auto* ascii_upper_original = ascii_upper_owned.base().data();
 			[[maybe_unused]] auto uppered_in_place = std::move(ascii_upper_owned).to_uppercase();
 			assert(uppered_in_place == u8"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRST"_utf8_sv);
 			assert(uppered_in_place.base().data() == ascii_upper_original);
+			auto partial_upper_owned = u8"ab\u00E4\u00DFcd"_utf8_s;
+			[[maybe_unused]] auto partial_uppered = std::move(partial_upper_owned).to_uppercase(2, 4);
+			assert(partial_uppered == u8"ab\u00C4SScd"_utf8_sv);
 			std::pmr::monotonic_buffer_resource resource;
 			const auto alloc = std::pmr::polymorphic_allocator<char8_t>{ &resource };
 			[[maybe_unused]] const auto lowered_alloc = u8"\u00C4\u03A9\u0130"_utf8_sv.to_lowercase(alloc);
 			assert(lowered_alloc == u8"\u00E4\u03C9i\u0307"_utf8_sv);
 			assert(lowered_alloc.get_allocator().resource() == &resource);
+			[[maybe_unused]] const auto partial_uppered_alloc = u8"ab\u00E4\u00DFcd"_utf8_sv.to_uppercase(2, 4, alloc);
+			assert(partial_uppered_alloc == u8"ab\u00C4SScd"_utf8_sv);
+			assert(partial_uppered_alloc.get_allocator().resource() == &resource);
 			[[maybe_unused]] const auto pmr_ascii_lowered = pmr::utf8_string{ u8"AbC-\u00E9\u00DF"_utf8_sv, alloc }.to_ascii_lowercase();
 			assert(pmr_ascii_lowered == u8"abc-\u00E9\u00DF"_utf8_sv);
 			assert(pmr_ascii_lowered.get_allocator().resource() == &resource);
@@ -2436,26 +2492,42 @@ inline void run_unicode_ranges_tests()
 		}
 		{
 			assert(u"AbC-\u00E9\u00DF"_utf16_sv.to_ascii_lowercase() == u"abc-\u00E9\u00DF"_utf16_sv);
+			assert(u"AbC-\u00E9\u00DF"_utf16_sv.to_ascii_lowercase(0, 3) == u"abc-\u00E9\u00DF"_utf16_sv);
 			assert(u"aBc-\u00E9\u00DF"_utf16_sv.to_ascii_uppercase() == u"ABC-\u00E9\u00DF"_utf16_sv);
+			assert(u"aBc-\u00E9\u00DF"_utf16_sv.to_ascii_uppercase(0, 3) == u"ABC-\u00E9\u00DF"_utf16_sv);
 			assert(u"\u00C4\u03A9\u0130"_utf16_sv.to_lowercase() == u"\u00E4\u03C9i\u0307"_utf16_sv);
+			assert(u"XX\u00C4\u03A9YY"_utf16_sv.to_lowercase(2, 2) == u"XX\u00E4\u03C9YY"_utf16_sv);
 			assert(u"\u00E4\u00DF\u03C9"_utf16_sv.to_uppercase() == u"\u00C4SS\u03A9"_utf16_sv);
+			assert(u"ab\u00E4\u00DFcd"_utf16_sv.to_uppercase(2, 2) == u"ab\u00C4SScd"_utf16_sv);
 			[[maybe_unused]] auto ascii_lowered_owned = utf16_string{ u"AbC-\u00E9\u00DF"_utf16_sv }.to_ascii_lowercase();
 			assert(ascii_lowered_owned == u"abc-\u00E9\u00DF"_utf16_sv);
+			auto partial_ascii_lower_owned = u"AbCdEfGhIjKlMnOpQrStUvWxYz0123456789-\u00E9\u00DF"_utf16_s;
+			[[maybe_unused]] auto partial_ascii_lowered = std::move(partial_ascii_lower_owned).to_ascii_lowercase(0, 26);
+			assert(partial_ascii_lowered == u"abcdefghijklmnopqrstuvwxyz0123456789-\u00E9\u00DF"_utf16_sv);
 			auto ascii_lower_owned = u"AbCdEfGhIjKlMnOpQrStUvWxYz0123456789AbCdEfGhIjKlMnOpQrSt"_utf16_s;
 			[[maybe_unused]] const auto* ascii_lower_original = ascii_lower_owned.base().data();
 			[[maybe_unused]] auto lowered_in_place = std::move(ascii_lower_owned).to_lowercase();
 			assert(lowered_in_place == u"abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrst"_utf16_sv);
 			assert(lowered_in_place.base().data() == ascii_lower_original);
+			auto partial_lower_owned = u"XX\u00C4\u03A9YY"_utf16_s;
+			[[maybe_unused]] auto partial_lowered = std::move(partial_lower_owned).to_lowercase(2, 2);
+			assert(partial_lowered == u"XX\u00E4\u03C9YY"_utf16_sv);
 			auto ascii_upper_owned = u"aBcDeFgHiJkLmNoPqRsTuVwXyZ0123456789aBcDeFgHiJkLmNoPqRsT"_utf16_s;
 			[[maybe_unused]] const auto* ascii_upper_original = ascii_upper_owned.base().data();
 			[[maybe_unused]] auto uppered_in_place = std::move(ascii_upper_owned).to_uppercase();
 			assert(uppered_in_place == u"ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRST"_utf16_sv);
 			assert(uppered_in_place.base().data() == ascii_upper_original);
+			auto partial_upper_owned = u"ab\u00E4\u00DFcd"_utf16_s;
+			[[maybe_unused]] auto partial_uppered = std::move(partial_upper_owned).to_uppercase(2, 2);
+			assert(partial_uppered == u"ab\u00C4SScd"_utf16_sv);
 			std::pmr::monotonic_buffer_resource resource;
 			const auto alloc = std::pmr::polymorphic_allocator<char16_t>{ &resource };
 			[[maybe_unused]] const auto lowered_alloc = u"\u00C4\u03A9\u0130"_utf16_sv.to_lowercase(alloc);
 			assert(lowered_alloc == u"\u00E4\u03C9i\u0307"_utf16_sv);
 			assert(lowered_alloc.get_allocator().resource() == &resource);
+			[[maybe_unused]] const auto partial_uppered_alloc = u"ab\u00E4\u00DFcd"_utf16_sv.to_uppercase(2, 2, alloc);
+			assert(partial_uppered_alloc == u"ab\u00C4SScd"_utf16_sv);
+			assert(partial_uppered_alloc.get_allocator().resource() == &resource);
 			[[maybe_unused]] const auto pmr_ascii_lowered = pmr::utf16_string{ u"AbC-\u00E9\u00DF"_utf16_sv, alloc }.to_ascii_lowercase();
 			assert(pmr_ascii_lowered == u"abc-\u00E9\u00DF"_utf16_sv);
 			assert(pmr_ascii_lowered.get_allocator().resource() == &resource);
@@ -4002,6 +4074,54 @@ static_assert(noexcept(utf16_string{}.reverse()));
 	{
 		utf8_string s{ utf8_text };
 		if (!expect_out_of_range([&] { s.reverse(1, 1); }))
+		{
+			assert(false);
+		}
+	}
+	{
+		if (!expect_out_of_range([&] { static_cast<void>(u8"A\u00E9B"_utf8_sv.to_uppercase(utf8_string::npos, 0)); }))
+		{
+			assert(false);
+		}
+	}
+	{
+		if (!expect_out_of_range([&] { static_cast<void>(u8"A\u00E9B"_utf8_sv.to_lowercase(2, 1)); }))
+		{
+			assert(false);
+		}
+	}
+	{
+		if (!expect_out_of_range([&] { static_cast<void>(u8"A\u00E9B"_utf8_s.to_ascii_uppercase(2, 1)); }))
+		{
+			assert(false);
+		}
+	}
+	{
+		if (!expect_out_of_range([&] { static_cast<void>(u8"A\u00E9B"_utf8_s.to_ascii_lowercase(1, 4)); }))
+		{
+			assert(false);
+		}
+	}
+	{
+		if (!expect_out_of_range([&] { static_cast<void>(u"A\U0001F600B"_utf16_sv.to_uppercase(utf16_string::npos, 0)); }))
+		{
+			assert(false);
+		}
+	}
+	{
+		if (!expect_out_of_range([&] { static_cast<void>(u"A\U0001F600B"_utf16_sv.to_lowercase(2, 1)); }))
+		{
+			assert(false);
+		}
+	}
+	{
+		if (!expect_out_of_range([&] { static_cast<void>(u"A\U0001F600B"_utf16_s.to_ascii_uppercase(2, 1)); }))
+		{
+			assert(false);
+		}
+	}
+	{
+		if (!expect_out_of_range([&] { static_cast<void>(u"A\U0001F600B"_utf16_s.to_ascii_lowercase(1, 4)); }))
 		{
 			assert(false);
 		}

@@ -1792,11 +1792,12 @@ namespace details
 
 		inline constexpr grapheme_scalar_info classify_grapheme_scalar(std::uint32_t scalar) noexcept
 		{
+			const auto properties = unicode::grapheme_properties(scalar);
 			return grapheme_scalar_info{
 				.scalar = scalar,
-				.break_property = unicode::grapheme_cluster_break(scalar),
-				.indic_property = unicode::indic_conjunct_break(scalar),
-				.extended_pictographic = unicode::is_extended_pictographic(scalar)
+				.break_property = properties.break_property,
+				.indic_property = properties.indic_property,
+				.extended_pictographic = properties.extended_pictographic
 			};
 		}
 
