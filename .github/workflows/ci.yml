@@ -215,6 +215,50 @@ jobs:
           ASAN_OPTIONS: ${{ matrix.asan_options }}
           UBSAN_OPTIONS: ${{ matrix.ubsan_options }}
 
+  docs-examples:
+    name: Docs examples (${{ matrix.name }}, C++23)
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: GCC
+            install_kind: gcc
+            packages: g++-14
+            cxx: g++-14
+            cxxflags: ""
+            output_dir: build/docs-examples-gcc
+          - name: Clang trunk
+            install_kind: clang
+            packages: clang-22 libc++-22-dev libc++abi-22-dev
+            cxx: clang++-22
+            cxxflags: "-stdlib=libc++"
+            output_dir: build/docs-examples-clang
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install GCC
+        if: matrix.install_kind == 'gcc'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ${{ matrix.packages }}
+
+      - name: Install Clang trunk
+        if: matrix.install_kind == 'clang'
+        run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 22
+          sudo apt-get install -y ${{ matrix.packages }}
+
+      - name: Show compiler version
+        run: ${{ matrix.cxx }} --version
+
+      - name: Compile docs examples
+        run: bash tools/compile_docs_examples.sh ${{ matrix.cxx }} ${{ matrix.output_dir }} -O0 -Wall -Wextra -Werror -pedantic ${{ matrix.cxxflags }}
+
   coverage:
     name: Coverage (Clang, libc++, C++23)
     runs-on: ubuntu-24.04

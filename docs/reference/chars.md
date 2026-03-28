@@ -1,76 +1,401 @@
 # Characters
 
-## `utf8_char`
+`utf8_char` and `utf16_char` are validated single-scalar value types.
 
-`utf8_char` stores a validated UTF-8 encoded scalar value.
+They are useful when you want to store or pass one Unicode scalar value without dropping down to raw UTF-8 bytes or UTF-16 code units.
 
-### Main responsibilities
+```cpp
+--8<-- "examples/reference/characters.cpp"
+```
 
-- construct from a scalar
-- construct from already-known-valid UTF-8 bytes
-- inspect the scalar value and code-unit count
-- encode as UTF-8 or UTF-16
-- Unicode-aware and ASCII-only classification
-- ASCII transforms
+## Constants And Default Construction
 
-### Important APIs
+### Synopsis
 
-Construction:
+```cpp
+utf8_char() = default;
+utf16_char() = default;
 
-- `from_scalar(...)`
-- `from_scalar_unchecked(...)`
-- `from_utf8_bytes_unchecked(...)`
+static const utf8_char replacement_character;
+static const utf8_char null_terminator;
 
-Observation and encoding:
+static const utf16_char replacement_character;
+static const utf16_char null_terminator;
+```
 
-- `as_scalar()`
-- `code_unit_count()`
-- `encode_utf8(...)`
-- `encode_utf16(...)`
+### Behavior
 
-Classification and transforms:
+- Value-initialized `utf8_char` and `utf16_char` hold U+0000.
+- `replacement_character` is U+FFFD.
+- `null_terminator` is U+0000.
 
-- Unicode-aware predicates such as `is_alphabetic()`, `is_numeric()`, `is_whitespace()`
-- ASCII-only predicates such as `is_ascii_alphabetic()`, `is_ascii_digit()`
-- `ascii_lowercase()`, `ascii_uppercase()`
-- `eq_ignore_ascii_case(...)`
+### Complexity
 
-`utf8_char` also supports increment and decrement across Unicode scalar values.
+Constant.
 
-## `utf16_char`
+### Exceptions
 
-`utf16_char` stores a validated UTF-16 encoded scalar value, either as one BMP code unit or a surrogate pair.
+None.
 
-### Main responsibilities
+### `noexcept`
 
-- construct from a scalar
-- construct from already-known-valid UTF-16 code units
-- inspect the scalar value and code-unit count
-- encode as UTF-16 or UTF-8
-- Unicode-aware and ASCII-only classification
+Default construction is non-throwing.
 
-### Important APIs
+## Checked Scalar Construction
 
-Construction:
+### Synopsis
 
-- `from_scalar(...)`
-- `from_utf16_code_units(...)`
-- `from_utf16_code_units_unchecked(...)`
+```cpp
+static constexpr std::optional<utf8_char> from_scalar(std::uint32_t scalar) noexcept;
+static constexpr std::optional<utf16_char> from_scalar(std::uint32_t scalar) noexcept;
+```
 
-Observation and encoding:
+### Behavior
 
-- `as_scalar()`
-- `code_unit_count()`
-- `encode_utf16(...)`
-- `encode_utf8(...)`
+Constructs a validated character from a Unicode scalar value and reports failure with [`std::optional`](https://en.cppreference.com/w/cpp/utility/optional).
 
-Like `utf8_char`, `utf16_char` also supports increment and decrement across Unicode scalar values.
+### Return value
 
-## When to use character types directly
+- Returns the constructed character when `scalar` is a valid Unicode scalar value.
+- Returns [`std::nullopt`](https://en.cppreference.com/w/cpp/utility/optional/nullopt) for invalid inputs such as surrogate code points or values above U+10FFFF.
 
-Use `utf8_char` or `utf16_char` when you need a validated scalar object rather than a whole string. Common examples:
+### Complexity
 
-- iterating scalars and storing one result
-- writing predicates that operate on a single character
-- passing validated characters into search or replace APIs
-- encoding a single scalar into a small buffer
+Constant.
+
+### Exceptions
+
+None.
+
+### `noexcept`
+
+Always `noexcept`.
+
+## Unchecked Construction
+
+### Synopsis
+
+```cpp
+static constexpr utf8_char from_scalar_unchecked(std::uint32_t scalar) noexcept;
+
+template<typename CharT>
+static constexpr utf8_char from_utf8_bytes_unchecked(const CharT* bytes, std::size_t size) noexcept;
+
+static constexpr utf16_char from_scalar_unchecked(std::uint32_t scalar) noexcept;
+
+template<typename CharT>
+static constexpr std::optional<utf16_char>
+from_utf16_code_units(const CharT* code_units, std::size_t size) noexcept;
+
+template<typename CharT>
+static constexpr utf16_char
+from_utf16_code_units_unchecked(const CharT* code_units, std::size_t size) noexcept;
+```
+
+### Behavior
+
+- `from_scalar_unchecked` trusts that the supplied scalar is valid.
+- `from_utf8_bytes_unchecked` trusts that `bytes[0, size)` encodes exactly one valid UTF-8 scalar.
+- `from_utf16_code_units` validates that the range holds exactly one valid UTF-16 scalar.
+- `from_utf16_code_units_unchecked` trusts that the supplied code units hold exactly one valid UTF-16 scalar.
+
+### Return value
+
+- The checked UTF-16 constructor returns `std::nullopt` when the range is not exactly one valid UTF-16 character.
+- The unchecked constructors always return a value.
+
+### Complexity
+
+Constant.
+
+### Exceptions
+
+None.
+
+### `noexcept`
+
+All listed overloads are `noexcept`.
+
+## Scalar Value, Encoding, And Cross-Encoding Conversion
+
+### Synopsis
+
+```cpp
+constexpr std::uint32_t as_scalar() const noexcept;
+
+constexpr operator utf16_char() const noexcept; // utf8_char only
+constexpr operator utf8_char() const noexcept;  // utf16_char only
+
+template <typename Allocator = std::allocator<char8_t>>
+constexpr basic_utf8_string<Allocator> to_utf8_owned(const Allocator& alloc = Allocator()) const;
+
+template <typename Allocator = std::allocator<char16_t>>
+constexpr basic_utf16_string<Allocator> to_utf16_owned(const Allocator& alloc = Allocator()) const;
+
+constexpr std::size_t code_unit_count() const noexcept;
+
+template<typename CharT, typename OutIt>
+constexpr std::size_t encode_utf8(OutIt out) const noexcept;
+
+template<typename CharT, typename OutIt>
+constexpr std::size_t encode_utf16(OutIt out) const noexcept;
+```
+
+### Behavior
+
+- `as_scalar()` returns the Unicode scalar value represented by the object.
+- The conversion operators transcode a single scalar between UTF-8 and UTF-16 character representations.
+- `to_utf8_owned()` and `to_utf16_owned()` materialize a one-character owning string in the corresponding encoding.
+- `code_unit_count()` returns the number of code units used by the current encoding:
+  - UTF-8: `1` to `4`
+  - UTF-16: `1` or `2`
+- `encode_utf8()` and `encode_utf16()` copy the current value into an output iterator and return the number of code units written.
+
+### Return value
+
+- `as_scalar()` returns the scalar directly.
+- `encode_*()` returns the number of output code units.
+- `to_*_owned()` returns an owning validated string containing exactly one character.
+
+### Complexity
+
+Constant.
+
+### Exceptions
+
+- `as_scalar()`, the conversion operators, `code_unit_count()`, and `encode_*()` do not throw.
+- `to_*_owned()` may throw allocator or container exceptions.
+
+### `noexcept`
+
+- `as_scalar()`, conversion operators, `code_unit_count()`, and `encode_*()` are `noexcept`.
+- `to_*_owned()` is not `noexcept`.
+
+## Scalar Iteration Helpers
+
+### Synopsis
+
+```cpp
+constexpr utf8_char& operator++() noexcept;
+constexpr utf8_char operator++(int) noexcept;
+constexpr utf8_char& operator--() noexcept;
+constexpr utf8_char operator--(int) noexcept;
+
+constexpr utf16_char& operator++() noexcept;
+constexpr utf16_char operator++(int) noexcept;
+constexpr utf16_char& operator--() noexcept;
+constexpr utf16_char operator--(int) noexcept;
+```
+
+### Behavior
+
+Advances or retreats across Unicode scalar values, skipping the surrogate range.
+
+The operations wrap:
+
+- decrementing U+0000 produces U+10FFFF
+- incrementing U+10FFFF produces U+0000
+
+### Complexity
+
+Constant.
+
+### Exceptions
+
+None.
+
+### `noexcept`
+
+All four operators are `noexcept`.
+
+## Unicode Classification Predicates
+
+### Synopsis
+
+```cpp
+constexpr bool is_ascii() const noexcept;
+constexpr bool is_alphabetic() const noexcept;
+constexpr bool is_alphanumeric() const noexcept;
+constexpr bool is_control() const noexcept;
+constexpr bool is_digit() const noexcept;
+constexpr bool is_lowercase() const noexcept;
+constexpr bool is_numeric() const noexcept;
+constexpr bool is_uppercase() const noexcept;
+constexpr bool is_whitespace() const noexcept;
+```
+
+### Behavior
+
+- `is_ascii()` tests whether the scalar is in the ASCII range.
+- The remaining predicates use the Unicode property tables shipped with the library.
+- `is_alphanumeric()` is defined as `is_alphabetic() || is_numeric()`.
+
+### Return value
+
+Returns `true` when the current scalar has the queried property.
+
+### Complexity
+
+Constant, with table lookups for the Unicode property predicates.
+
+### Exceptions
+
+None.
+
+### `noexcept`
+
+All listed overloads are `noexcept`.
+
+## ASCII Classification Predicates
+
+### Synopsis
+
+```cpp
+constexpr bool is_ascii_alphabetic() const noexcept;
+constexpr bool is_ascii_alphanumeric() const noexcept;
+constexpr bool is_ascii_control() const noexcept;
+constexpr bool is_ascii_digit() const noexcept;
+constexpr bool is_ascii_graphic() const noexcept;
+constexpr bool is_ascii_hexdigit() const noexcept;
+constexpr bool is_ascii_lowercase() const noexcept;
+constexpr bool is_ascii_octdigit() const noexcept;
+constexpr bool is_ascii_punctuation() const noexcept;
+constexpr bool is_ascii_uppercase() const noexcept;
+constexpr bool is_ascii_whitespace() const noexcept;
+```
+
+### Behavior
+
+These methods first require the value to be ASCII and then apply the corresponding ASCII-only classification rule.
+
+### Return value
+
+Returns `false` for all non-ASCII characters.
+
+### Complexity
+
+Constant.
+
+### Exceptions
+
+None.
+
+### `noexcept`
+
+All listed overloads are `noexcept`.
+
+## ASCII Transforms And ASCII Comparison
+
+### Synopsis
+
+```cpp
+constexpr utf8_char ascii_lowercase() const noexcept;
+constexpr utf8_char ascii_uppercase() const noexcept;
+constexpr bool eq_ignore_ascii_case(utf8_char other) const noexcept;
+constexpr void swap(utf8_char& other) noexcept;
+
+constexpr utf16_char ascii_lowercase() const noexcept;
+constexpr utf16_char ascii_uppercase() const noexcept;
+constexpr bool eq_ignore_ascii_case(utf16_char other) const noexcept;
+constexpr void swap(utf16_char& other) noexcept;
+```
+
+### Behavior
+
+- `ascii_lowercase()` and `ascii_uppercase()` only modify ASCII letters.
+- Non-ASCII characters are returned unchanged.
+- `eq_ignore_ascii_case()` lowercases both operands with the ASCII-only transform and compares the results.
+- `swap()` exchanges the stored code units.
+
+### Complexity
+
+Constant.
+
+### Exceptions
+
+None.
+
+### `noexcept`
+
+All listed overloads are `noexcept`.
+
+## Comparison, Streaming, Hashing, And Formatting
+
+### Synopsis
+
+```cpp
+friend constexpr bool operator==(const utf8_char&, const utf8_char&) = default;
+friend constexpr auto operator<=>(const utf8_char&, const utf8_char&) = default;
+friend constexpr bool operator==(const utf8_char& lhs, char rhs) noexcept;
+friend constexpr bool operator==(const utf8_char& lhs, char8_t rhs) noexcept;
+friend std::ostream& operator<<(std::ostream& os, const utf8_char& ch);
+
+friend constexpr bool operator==(const utf16_char&, const utf16_char&) = default;
+friend constexpr auto operator<=>(const utf16_char&, const utf16_char&) = default;
+friend constexpr bool operator==(const utf16_char& lhs, char16_t rhs) noexcept;
+friend std::ostream& operator<<(std::ostream& os, const utf16_char& ch);
+
+template<> struct std::hash<utf8_char>;
+template<> struct std::hash<utf16_char>;
+
+template<> struct std::formatter<utf8_char, char>;
+template<> struct std::formatter<utf8_char, wchar_t>;
+template<> struct std::formatter<utf16_char, char>;
+template<> struct std::formatter<utf16_char, wchar_t>;
+```
+
+### Behavior
+
+- The defaulted comparisons compare the stored encoded value.
+- `utf8_char` compares directly with `char` and `char8_t` when the value is a single-byte ASCII code point.
+- `utf16_char` compares directly with `char16_t` when the value is a single UTF-16 code unit.
+- Stream insertion writes a textual representation:
+  - `utf8_char` writes its UTF-8 bytes directly
+  - `utf16_char` transcodes to UTF-8 for `std::ostream`
+- [`std::hash`](https://en.cppreference.com/w/cpp/utility/hash) hashes the encoded text representation.
+- The [`std::formatter`](https://en.cppreference.com/w/cpp/utility/format/formatter) specializations support:
+  - normal textual formatting
+  - `'c'` as a text presentation alias
+  - numeric presentations `d`, `b`, `B`, `o`, `x`, `X`, which format `as_scalar()`
+
+### Complexity
+
+Constant.
+
+### Exceptions
+
+- The comparison overloads and hashers do not throw.
+- Stream insertion may report stream errors through the stream object.
+- Formatter parsing may throw [`std::format_error`](https://en.cppreference.com/w/cpp/utility/format/format_error) for unsupported or malformed format specifiers.
+
+### `noexcept`
+
+- The comparison overloads and hashers are non-throwing.
+- Stream insertion and formatters are not `noexcept`.
+
+## Character Literals
+
+### Synopsis
+
+```cpp
+using namespace unicode_ranges::literals;
+
+consteval utf8_char operator ""_u8c();
+consteval utf16_char operator ""_u16c();
+```
+
+### Behavior
+
+The literal must encode exactly one valid UTF-8 or UTF-16 character in the corresponding encoding.
+
+### Return value
+
+Returns the validated `utf8_char` or `utf16_char`.
+
+### Exceptions
+
+Because these are `consteval` literals, invalid input is rejected during compilation rather than at runtime.
+
+### Example
+
+The example at the top of this page uses both `utf8_char::from_scalar(...)` and `_u8c` in printable, emoji-heavy form.

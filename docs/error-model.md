@@ -62,14 +62,14 @@ These are returned by checked APIs such as `utf16_string_view::from_code_units(.
 
 The library distinguishes between:
 
-- checked factories that validate incoming raw input and return `std::expected`
+- checked factories that validate incoming raw input and return [`std::expected`](https://en.cppreference.com/w/cpp/utility/expected)
 - unchecked construction APIs that assume the caller already proved validity
 
 Use the unchecked APIs only when validity is already guaranteed by the caller or by a surrounding protocol.
 
 ## Bounds and semantic errors
 
-Beyond construction-time validation, checked text operations may throw standard exceptions for invalid bounds or boundary misuse. Typical examples include:
+Beyond construction-time validation, checked text operations may throw standard exceptions such as [`std::out_of_range`](https://en.cppreference.com/w/cpp/error/out_of_range) for invalid bounds or boundary misuse. Typical examples include:
 
 - offsets that are out of range
 - offsets that do not land on a valid character boundary

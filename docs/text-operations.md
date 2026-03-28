@@ -14,6 +14,10 @@ Both borrowed and owning text types expose STL-style search APIs, including:
 
 These work with text, characters, predicates, and span-based character sets depending on the overload.
 
+```cpp
+--8<-- "examples/text-operations/search-and-replace.cpp"
+```
+
 ## Split and match families
 
 String views expose a broad split/match surface:
@@ -28,6 +32,10 @@ String views expose a broad split/match surface:
 - `split_whitespace`, `split_ascii_whitespace`
 
 Delimiter behavior is intentionally explicit. See the split sections in the [string view reference](reference/string-views.md).
+
+```cpp
+--8<-- "examples/text-operations/split-and-trim.cpp"
+```
 
 ## Trim and prefix/suffix operations
 
@@ -58,6 +66,10 @@ Important boundary-aware APIs include:
 
 These are essential whenever offsets are expressed in code units but user-visible semantics depend on characters or graphemes.
 
+```cpp
+--8<-- "examples/text-operations/boundaries-and-graphemes.cpp"
+```
+
 ## Reverse and replace on owning strings
 
 Owning strings add mutating APIs such as:
@@ -73,10 +85,14 @@ Owning strings add mutating APIs such as:
 
 Case-transformation APIs also support partial overloads on owning strings:
 
-- `to_ascii_lowercase(pos, count = npos)`
-- `to_ascii_uppercase(pos, count = npos)`
-- `to_lowercase(pos, count = npos)`
-- `to_uppercase(pos, count = npos)`
+- `to_ascii_lowercase(pos, count)`
+- `to_ascii_uppercase(pos, count)`
+- `to_lowercase(pos, count)`
+- `to_uppercase(pos, count)`
+
+```cpp
+--8<-- "examples/text-operations/reverse.cpp"
+```
 
 ## Return-unit semantics
 

@@ -21,6 +21,10 @@ markdown_extensions:
   - def_list
   - footnotes
   - tables
+  - pymdownx.snippets:
+      base_path:
+        - docs
+      check_paths: true
   - toc:
       permalink: true
   - pymdownx.highlight:

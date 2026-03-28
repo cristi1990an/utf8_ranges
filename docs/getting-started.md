@@ -25,47 +25,28 @@ The checked-in Unicode data currently tracks Unicode `17.0.0`.
 - Use `utf8_string::from_bytes(...)` / `utf16_string::from_code_units(...)` when input arrives as raw runtime data.
 - Use `_utf8_s` / `_utf16_s` when you want an owning validated string immediately.
 
-## Compile-time validated literals
+## A first validated view
+
+This is the style the docs will use going forward: visible Unicode text, runnable code, `std::println`, and comments showing what to expect.
 
 ```cpp
-#include "unicode_ranges.hpp"
-
-using namespace unicode_ranges;
-using namespace unicode_ranges::literals;
-
-constexpr auto text = u8"caf\u00E9 \u20AC"_utf8_sv;
-
-static_assert(text.size() == 9);       // UTF-8 code units
-static_assert(text.char_count() == 6); // Unicode scalar values
-static_assert(text.find(u8"\u20AC"_u8c) == 6); // byte offset
+--8<-- "examples/getting-started/validated-view.cpp"
 ```
 
 ## Runtime validation
 
+When text arrives at runtime as raw bytes, validate it once and keep the validated type:
+
 ```cpp
-#include "unicode_ranges.hpp"
+--8<-- "examples/getting-started/runtime-validation.cpp"
+```
 
-#include <print>
-#include <string>
+## Formatting and printing
 
-using namespace unicode_ranges;
+Library-defined UTF-8 and UTF-16 types support formatting and printing directly. Borrowed views such as `chars()` and `graphemes()` are easy to inspect too. For grapheme views, the examples use `"{::s}"` so the printed range stays visually uniform with the underlying text:
 
-int main()
-{
-    std::string raw = "caf\xC3\xA9";
-
-    auto text = utf8_string::from_bytes(raw);
-    if (!text)
-    {
-        std::println(stderr,
-                     "Invalid UTF-8 at byte {}",
-                     text.error().first_invalid_byte_index);
-        return 1;
-    }
-
-    std::println("Characters: {}", text->char_count());
-    std::println("As UTF-16: {}", text->to_utf16());
-}
+```cpp
+--8<-- "examples/getting-started/formatting.cpp"
 ```
 
 ## Views versus owning strings
@@ -86,28 +67,9 @@ The library intentionally distinguishes:
 
 UTF-8 view/string search APIs generally return byte offsets. UTF-16 view/string search APIs generally return code-unit offsets. Character-oriented APIs are named explicitly, such as `char_at`, `is_char_boundary`, and `ceil_char_boundary`.
 
-## Formatting and printing
+## Example sanity checks
 
-Library-defined UTF-8 and UTF-16 types support formatting and stream insertion, unlike standard `std::u8string` itself.
-
-```cpp
-#include "unicode_ranges.hpp"
-
-#include <cassert>
-#include <format>
-#include <sstream>
-
-using namespace unicode_ranges;
-using namespace unicode_ranges::literals;
-
-const utf8_string text = u8"caf\u00E9 \u20AC"_utf8_s;
-
-assert(std::format("{}", text) == "caf\u00E9 \u20AC");
-
-std::ostringstream oss;
-oss << text;
-assert(oss.str() == "caf\u00E9 \u20AC");
-```
+The examples under `docs/examples/` are compiled in CI so the docs do not silently drift away from the library surface.
 
 ## Where to go next
 

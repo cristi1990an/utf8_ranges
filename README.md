@@ -6,7 +6,7 @@ It provides validated character types, borrowed string views, owning strings, gr
 
 ## Documentation
 
-- Docs site: `https://cristi1990an.github.io/unicode_ranges/`
+- Docs site: [https://cristi1990an.github.io/unicode_ranges/](https://cristi1990an.github.io/unicode_ranges/)
 - Docs in repo: [docs/](docs/)
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 
@@ -42,15 +42,24 @@ Unicode tables currently track Unicode `17.0.0`.
 ```cpp
 #include "unicode_ranges.hpp"
 
+#include <print>
+
 using namespace unicode_ranges;
 using namespace unicode_ranges::literals;
 
-constexpr auto text = u8"caf\u00E9 \u20AC"_utf8_sv;
+int main()
+{
+    constexpr auto text = u8"é🇷🇴!"_utf8_sv;
 
-static_assert(text.size() == 9);       // UTF-8 code units
-static_assert(text.char_count() == 6); // Unicode scalar values
-static_assert(text.grapheme_count() == 6);
-static_assert(text.find(u8"\u20AC"_u8c) == 6); // byte offset
+    std::println("text: {}", text);                               // é🇷🇴!
+    std::println("size(): {}", text.size());                      // 12 UTF-8 code units
+    std::println("char_count(): {}", text.char_count());          // 5 Unicode scalars
+    std::println("grapheme_count(): {}", text.grapheme_count());  // 3 graphemes
+    std::println("find('!'): {}", text.find(u8"!"_u8c));          // 11
+    std::println("find('🇷'): {}", text.find(u8"🇷"_u8c));         // 3
+    std::println("chars(): {}", text.chars());                    // [e, ́, 🇷, 🇴, !]
+    std::println("graphemes(): {::s}", text.graphemes());         // [é, 🇷🇴, !]
+}
 ```
 
 For runtime validation of raw input:
@@ -59,13 +68,13 @@ For runtime validation of raw input:
 #include "unicode_ranges.hpp"
 
 #include <print>
-#include <string_view>
+#include <string>
 
 using namespace unicode_ranges;
 
 int main()
 {
-    constexpr std::string_view raw = "caf\xC3\xA9";
+    std::string raw = "Grüße din România 👋";
 
     auto text = utf8_string::from_bytes(raw);
     if (!text)
@@ -76,7 +85,10 @@ int main()
         return 1;
     }
 
-    std::println("Characters: {}", text->char_count());
+    std::println("validated: {}", *text);                 // Grüße din România 👋
+    std::println("characters: {}", text->char_count());   // 18
+    std::println("first char: {}", text->front().value()); // G
+    std::println("last char: {}", text->back().value());   // 👋
 }
 ```
 
@@ -90,6 +102,7 @@ int main()
 - Unicode normalization and full case folding
 - `constexpr`-friendly literals and core operations
 - Formatting, streaming, and hashing support for library types
+- Docs examples under `docs/examples/` are compiled in CI for sanity
 
 ## Build docs locally
 

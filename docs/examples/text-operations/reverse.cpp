@@ -1,0 +1,14 @@
+#include "unicode_ranges.hpp"
+
+#include <print>
+
+using namespace unicode_ranges;
+using namespace unicode_ranges::literals;
+
+int main()
+{
+	auto text = u8"café noir"_utf8_s;
+
+	text.reverse();
+	std::println("reverse(): {}", text); // rion éfac
+}

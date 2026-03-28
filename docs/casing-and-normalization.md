@@ -16,25 +16,24 @@ Unicode-aware:
 
 The Unicode-aware APIs are locale-independent. They follow generated Unicode tables and do not apply locale-specific tailoring.
 
-## Partial casing on owning strings
-
-Owning strings support both whole-string and subrange casing:
-
 ```cpp
-text.to_uppercase();
-text.to_uppercase(pos, count);
+--8<-- "examples/casing/unicode-case.cpp"
 ```
 
-The checked subrange overloads validate bounds and character boundaries. Whole-string overloads remain the cheaper path.
+## Partial casing on owning strings
+
+Owning strings support both whole-string and subrange casing. The checked subrange overloads validate bounds and character boundaries. Whole-string overloads remain the cheaper path.
+
+```cpp
+--8<-- "examples/casing/partial-case.cpp"
+```
 
 ## Case folding
 
 Case folding is the Unicode form intended for caseless matching rather than display transformation.
 
-Available API:
-
 ```cpp
-auto folded = text.case_fold();
+--8<-- "examples/casing/case-fold.cpp"
 ```
 
 That is different from simply lowercasing text. Case folding handles mappings such as German `ß` in a way intended for case-insensitive comparison behavior.
@@ -48,24 +47,14 @@ Supported normalization forms:
 - NFKC
 - NFKD
 
-Available APIs:
-
 ```cpp
-text.normalize(normalization_form::nfc);
-text.to_nfc();
-text.to_nfd();
-text.to_nfkc();
-text.to_nfkd();
+--8<-- "examples/casing/normalization.cpp"
 ```
 
 And corresponding checks:
 
 ```cpp
-text.is_normalized(normalization_form::nfc);
-text.is_nfc();
-text.is_nfd();
-text.is_nfkc();
-text.is_nfkd();
+--8<-- "examples/casing/normalization-checks.cpp"
 ```
 
 ## Why normalization matters
