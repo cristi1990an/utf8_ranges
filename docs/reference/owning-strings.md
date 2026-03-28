@@ -2,7 +2,7 @@
 
 `basic_utf8_string<Allocator>` and `basic_utf16_string<Allocator>` are validated owning string types.
 
-The aliases exported from [core.hpp](../../unicode_ranges/core.hpp) are:
+The aliases exported from [`unicode_ranges/core.hpp`](https://github.com/cristi1990an/unicode_ranges/blob/main/unicode_ranges/core.hpp) are:
 
 - `utf8_string = basic_utf8_string<>`
 - `utf16_string = basic_utf16_string<>`
