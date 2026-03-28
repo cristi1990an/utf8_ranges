@@ -218,7 +218,6 @@ jobs:
   docs-examples:
     name: Docs examples (${{ matrix.name }}, C++23)
     runs-on: ubuntu-24.04
-    continue-on-error: ${{ matrix.install_kind == 'gcc' }}
     strategy:
       fail-fast: false
       matrix:
@@ -259,10 +258,11 @@ jobs:
 
       - name: Compile docs examples
         id: compile_docs_examples
+        continue-on-error: ${{ matrix.install_kind == 'gcc' }}
         run: bash tools/compile_docs_examples.sh ${{ matrix.cxx }} ${{ matrix.output_dir }} -O0 -Wall -Wextra -Werror -pedantic ${{ matrix.cxxflags }}
 
       - name: Note GCC docs-example formatting limitation
-        if: failure() && matrix.install_kind == 'gcc'
+        if: steps.compile_docs_examples.outcome == 'failure' && matrix.install_kind == 'gcc'
         run: |
           {
             echo "## Docs examples (GCC)"
