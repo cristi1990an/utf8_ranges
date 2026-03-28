@@ -256,12 +256,19 @@ template<typename Allocator> struct std::formatter<basic_utf16_string<Allocator>
 - Characters format as text by default.
 - Character [`std::formatter`](https://en.cppreference.com/w/cpp/utility/format/formatter) specializations also support numeric presentations `d`, `b`, `B`, `o`, `x`, and `X`, which print `as_scalar()`.
 - String and string-view formatters print textual content.
-- Standard range formatting composes with the library formatters, which is why examples such as `std::println("{}", text.chars())` work directly.
+- On standard libraries with C++23 range-format support for custom views, range formatting composes with the library formatters, which is why examples such as `std::println("{}", text.chars())` can work directly.
 
 Two practical printing rules used throughout this documentation:
 
 - `std::println("{}", text.chars())` prints a range of validated characters.
 - `std::println("{::s}", text.graphemes())` applies string formatting to each grapheme cluster, which is usually the cleanest textual representation.
+
+Compatibility note:
+
+- the library-defined character, string-view, and owning-string types have direct formatter support
+- direct formatting of helper views such as `utf8_view` and `grapheme_cluster_view<char8_t>` depends on the standard library's implementation of C++23 range formatting
+- this currently works with the MSVC STL and with libc++
+- libstdc++ 14 does not currently format these custom helper views directly, so the GCC docs-example CI job is allowed to fail without blocking the overall workflow
 
 ### Complexity
 

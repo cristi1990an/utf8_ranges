@@ -49,6 +49,12 @@ Library-defined UTF-8 and UTF-16 types support formatting and printing directly.
 --8<-- "examples/getting-started/formatting.cpp"
 ```
 
+Note:
+
+- direct `std::println("{}", text.chars())` and `std::println("{::s}", text.graphemes())` rely on C++23 range-formatting support in the standard library
+- this works on the MSVC STL and on libc++
+- libstdc++ 14 does not currently format these custom view types directly, so the GCC docs-example CI job is informational rather than blocking
+
 ## Views versus owning strings
 
 - `utf8_string_view` / `utf16_string_view` borrow existing storage.
@@ -69,7 +75,7 @@ UTF-8 view/string search APIs generally return byte offsets. UTF-16 view/string 
 
 ## Example sanity checks
 
-The examples under `docs/examples/` are compiled in CI so the docs do not silently drift away from the library surface.
+The examples under `docs/examples/` are compiled in CI so the docs do not silently drift away from the library surface. The one current exception is direct `std::print` formatting of helper views on GCC/libstdc++ 14, which is tracked as an informational, non-blocking docs-example failure.
 
 ## Where to go next
 
