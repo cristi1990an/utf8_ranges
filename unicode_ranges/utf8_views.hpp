@@ -22,11 +22,6 @@ namespace views
 	class utf8_view : public std::ranges::view_interface<utf8_view>
 	{
 	public:
-		static constexpr utf8_view from_bytes_unchecked(std::u8string_view base) noexcept
-		{
-			return utf8_view{ base };
-		}
-
 		[[nodiscard]]
 		constexpr std::u8string_view base() const noexcept
 		{
@@ -106,6 +101,14 @@ namespace views
 		}
 
 	private:
+		template <typename Derived, typename View>
+		friend class details::utf8_string_crtp;
+
+		static constexpr utf8_view from_bytes_unchecked(std::u8string_view base) noexcept
+		{
+			return utf8_view{ base };
+		}
+
 		constexpr explicit utf8_view(std::u8string_view base) noexcept
 			: base_(base)
 		{}
@@ -116,11 +119,6 @@ namespace views
 	class reversed_utf8_view : public std::ranges::view_interface<reversed_utf8_view>
 	{
 	public:
-		static constexpr reversed_utf8_view from_bytes_unchecked(std::u8string_view base) noexcept
-		{
-			return reversed_utf8_view{ base };
-		}
-
 		class iterator
 		{
 		public:
@@ -216,6 +214,14 @@ namespace views
 		}
 
 	private:
+		template <typename Derived, typename View>
+		friend class details::utf8_string_crtp;
+
+		static constexpr reversed_utf8_view from_bytes_unchecked(std::u8string_view base) noexcept
+		{
+			return reversed_utf8_view{ base };
+		}
+
 		constexpr explicit reversed_utf8_view(std::u8string_view base) noexcept
 			: base_(base)
 		{}

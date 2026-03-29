@@ -3212,13 +3212,13 @@ inline void run_unicode_ranges_tests()
 	// Direct UTF-16 view iteration, both forward and reverse.
 	{
 		constexpr std::u16string_view text = u"Aé😀";
-		[[maybe_unused]] const auto view = views::utf16_view::from_code_units_unchecked(text);
+		[[maybe_unused]] const auto view = utf16_string_view::from_code_units(text).value().chars();
 		assert(std::ranges::equal(view, std::array{ u"A"_u16c, u"é"_u16c, u"😀"_u16c }));
 	}
 	{
 		const std::u16string text = u"Aé😀";
 		std::string decoded;
-		for (const utf16_char ch : views::utf16_view::from_code_units_unchecked(text))
+		for (const utf16_char ch : utf16_string_view::from_code_units(text).value().chars())
 		{
 			ch.encode_utf8<char>(std::back_inserter(decoded));
 		}
@@ -3226,13 +3226,13 @@ inline void run_unicode_ranges_tests()
 	}
 		{
 			constexpr std::u16string_view text = u"Aé😀";
-			[[maybe_unused]] const auto view = views::reversed_utf16_view::from_code_units_unchecked(text);
+			[[maybe_unused]] const auto view = utf16_string_view::from_code_units(text).value().reversed_chars();
 			assert(std::ranges::equal(view, std::array{ u"😀"_u16c, u"é"_u16c, u"A"_u16c }));
 		}
 		{
 			const std::u16string text = u"Aé😀";
 			std::string decoded;
-			for (const utf16_char ch : views::reversed_utf16_view::from_code_units_unchecked(text))
+			for (const utf16_char ch : utf16_string_view::from_code_units(text).value().reversed_chars())
 			{
 				ch.encode_utf8<char>(std::back_inserter(decoded));
 			}

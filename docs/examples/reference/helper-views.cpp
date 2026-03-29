@@ -7,16 +7,16 @@ using namespace unicode_ranges::literals;
 
 int main()
 {
-	constexpr std::u8string_view utf8_bytes = u8"😄🇷🇴✨";
-	constexpr std::u16string_view utf16_code_units = u"😄🇷🇴✨";
+	constexpr auto utf8_text = "😄🇷🇴✨"_utf8_sv;
+	constexpr auto utf16_text = u"😄🇷🇴✨"_utf16_sv;
 
-	const auto utf8_chars = views::utf8_view::from_bytes_unchecked(utf8_bytes);
-	const auto utf8_reversed = views::reversed_utf8_view::from_bytes_unchecked(utf8_bytes);
-	const auto utf8_graphemes = views::grapheme_cluster_view<char8_t>::from_code_units_unchecked(utf8_bytes);
+	const auto utf8_chars = utf8_text.chars();
+	const auto utf8_reversed = utf8_text.reversed_chars();
+	const auto utf8_graphemes = utf8_text.graphemes();
 
-	const auto utf16_chars = views::utf16_view::from_code_units_unchecked(utf16_code_units);
-	const auto utf16_reversed = views::reversed_utf16_view::from_code_units_unchecked(utf16_code_units);
-	const auto utf16_graphemes = views::grapheme_cluster_view<char16_t>::from_code_units_unchecked(utf16_code_units);
+	const auto utf16_chars = utf16_text.chars();
+	const auto utf16_reversed = utf16_text.reversed_chars();
+	const auto utf16_graphemes = utf16_text.graphemes();
 
 	std::println("{}", utf8_chars);            // [😄, 🇷, 🇴, ✨]
 	std::println("{}", utf8_reversed);         // [✨, 🇴, 🇷, 😄]

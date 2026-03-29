@@ -9,7 +9,6 @@ This page covers the helper view types in `unicode_ranges::views`, the compile-t
 ```cpp
 class utf8_view : public std::ranges::view_interface<utf8_view> {
 public:
-    static constexpr utf8_view from_bytes_unchecked(std::u8string_view base) noexcept;
     constexpr std::u8string_view base() const noexcept;
     constexpr iterator begin() const noexcept;
     constexpr std::default_sentinel_t end() const noexcept;
@@ -18,7 +17,6 @@ public:
 
 class utf16_view : public std::ranges::view_interface<utf16_view> {
 public:
-    static constexpr utf16_view from_code_units_unchecked(std::u16string_view base) noexcept;
     constexpr std::u16string_view base() const noexcept;
     constexpr iterator begin() const noexcept;
     constexpr std::default_sentinel_t end() const noexcept;
@@ -30,6 +28,7 @@ public:
 
 - These views adapt already-validated code-unit sequences into ranges of `utf8_char` or `utf16_char`.
 - The views inherit [`std::ranges::view_interface`](https://en.cppreference.com/w/cpp/ranges/view_interface) and model lazy borrowed forward views.
+- They are normally obtained from validated text via `chars()`, for example `"😄🇷🇴✨"_utf8_sv.chars()` or `u"😄🇷🇴✨"_utf16_sv.chars()`.
 - The views are cheap to copy.
 - `reserve_hint()` reports the number of source code units, which is a safe upper bound for the number of yielded characters.
 
@@ -57,7 +56,6 @@ All listed members are `noexcept`.
 ```cpp
 class reversed_utf8_view : public std::ranges::view_interface<reversed_utf8_view> {
 public:
-    static constexpr reversed_utf8_view from_bytes_unchecked(std::u8string_view base) noexcept;
     constexpr iterator begin() const noexcept;
     constexpr std::default_sentinel_t end() const noexcept;
     constexpr std::size_t reserve_hint() const noexcept;
@@ -65,7 +63,6 @@ public:
 
 class reversed_utf16_view : public std::ranges::view_interface<reversed_utf16_view> {
 public:
-    static constexpr reversed_utf16_view from_code_units_unchecked(std::u16string_view base) noexcept;
     constexpr iterator begin() const noexcept;
     constexpr std::default_sentinel_t end() const noexcept;
     constexpr std::size_t reserve_hint() const noexcept;
@@ -76,6 +73,7 @@ public:
 
 - These helper views inherit [`std::ranges::view_interface`](https://en.cppreference.com/w/cpp/ranges/view_interface).
 - They are lazy borrowed forward views over the same underlying storage.
+- They are normally obtained from validated text via `reversed_chars()`.
 - They iterate validated characters from the end without first materializing a reversed string.
 
 ### Complexity
@@ -107,9 +105,6 @@ class grapheme_cluster_view : public std::ranges::view_interface<grapheme_cluste
 public:
     using cluster_type = std::conditional_t<std::same_as<CharT, char8_t>, utf8_string_view, utf16_string_view>;
 
-    static constexpr grapheme_cluster_view
-    from_code_units_unchecked(std::basic_string_view<CharT> base) noexcept;
-
     constexpr iterator begin() const noexcept;
     constexpr std::default_sentinel_t end() const noexcept;
     constexpr std::size_t reserve_hint() const noexcept;
@@ -121,6 +116,7 @@ public:
 - `grapheme_cluster_view<char8_t>` yields `utf8_string_view` grapheme clusters.
 - `grapheme_cluster_view<char16_t>` yields `utf16_string_view` grapheme clusters.
 - The view inherits [`std::ranges::view_interface`](https://en.cppreference.com/w/cpp/ranges/view_interface).
+- It is normally obtained from validated text via `graphemes()`.
 - It is a lazy borrowed forward view and computes grapheme boundaries on demand during iteration.
 
 ### Complexity

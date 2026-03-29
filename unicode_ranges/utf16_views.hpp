@@ -19,11 +19,6 @@ namespace views
 	class utf16_view : public std::ranges::view_interface<utf16_view>
 	{
 	public:
-		static constexpr utf16_view from_code_units_unchecked(std::u16string_view base) noexcept
-		{
-			return utf16_view{ base };
-		}
-
 		[[nodiscard]]
 		constexpr std::u16string_view base() const noexcept
 		{
@@ -105,6 +100,14 @@ namespace views
 		}
 
 	private:
+		template <typename Derived, typename View>
+		friend class details::utf16_string_crtp;
+
+		static constexpr utf16_view from_code_units_unchecked(std::u16string_view base) noexcept
+		{
+			return utf16_view{ base };
+		}
+
 		constexpr explicit utf16_view(std::u16string_view base) noexcept
 			: base_(base)
 		{}
@@ -115,11 +118,6 @@ namespace views
 	class reversed_utf16_view : public std::ranges::view_interface<reversed_utf16_view>
 	{
 	public:
-		static constexpr reversed_utf16_view from_code_units_unchecked(std::u16string_view base) noexcept
-		{
-			return reversed_utf16_view{ base };
-		}
-
 		class iterator
 		{
 		public:
@@ -238,6 +236,14 @@ namespace views
 		}
 
 	private:
+		template <typename Derived, typename View>
+		friend class details::utf16_string_crtp;
+
+		static constexpr reversed_utf16_view from_code_units_unchecked(std::u16string_view base) noexcept
+		{
+			return reversed_utf16_view{ base };
+		}
+
 		constexpr explicit reversed_utf16_view(std::u16string_view base) noexcept
 			: base_(base)
 		{}

@@ -18,11 +18,6 @@ namespace views
 		using code_unit_type = CharT;
 		using cluster_type = std::conditional_t<std::same_as<CharT, char8_t>, utf8_string_view, utf16_string_view>;
 
-		static constexpr grapheme_cluster_view from_code_units_unchecked(std::basic_string_view<CharT> base) noexcept
-		{
-			return grapheme_cluster_view{ base };
-		}
-
 		class iterator
 		{
 		public:
@@ -113,6 +108,17 @@ namespace views
 		}
 
 	private:
+		template <typename Derived, typename View>
+		friend class details::utf8_string_crtp;
+
+		template <typename Derived, typename View>
+		friend class details::utf16_string_crtp;
+
+		static constexpr grapheme_cluster_view from_code_units_unchecked(std::basic_string_view<CharT> base) noexcept
+		{
+			return grapheme_cluster_view{ base };
+		}
+
 		constexpr explicit grapheme_cluster_view(std::basic_string_view<CharT> base) noexcept
 			: base_(base)
 		{}
