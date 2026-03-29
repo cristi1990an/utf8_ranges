@@ -41,11 +41,25 @@ jobs:
       - name: Build docs
         run: python -m mkdocs build --strict
 
+      - name: Show generated site structure
+        run: |
+          echo "Top-level generated files:"
+          ls -la _site
+          echo
+          echo "Generated asset files:"
+          find _site/assets -maxdepth 2 -type f | sort
+
+      - name: Upload generated site artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mkdocs-site
+          path: _site/
+
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v3
         with:
-          path: site/
+          path: _site/
 
   deploy:
     name: Deploy docs
