@@ -7,8 +7,8 @@ using namespace unicode_ranges::literals;
 
 int main()
 {
-	const auto sparkle = utf8_char::from_scalar(U'✨').value();
-	const auto smile = utf16_char::from_scalar(U'😄').value();
+	const auto sparkle = "✨"_u8c;
+	const auto smile = u"😄"_u16c;
 
 	std::println("{}", sparkle);                    // ✨
 	std::println("{}", sparkle.code_unit_count());  // 3

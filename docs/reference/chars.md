@@ -4,6 +4,8 @@
 
 They are useful when you want to store or pass one Unicode scalar value without dropping down to raw UTF-8 bytes or UTF-16 code units.
 
+When the character is known at compile time, the literal operators such as `_u8c` and `_u16c` are usually the nicest entry point. `from_scalar(...)` is the runtime path when the scalar value arrives as data.
+
 ```cpp
 --8<-- "examples/reference/characters.cpp"
 ```
