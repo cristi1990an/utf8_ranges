@@ -49,6 +49,12 @@ None.
 
 All listed members are `noexcept`.
 
+### Example
+
+```cpp
+--8<-- "examples/reference/lossy-views.cpp"
+```
+
 ## `views::reversed_utf8_view` And `views::reversed_utf16_view`
 
 ### Synopsis

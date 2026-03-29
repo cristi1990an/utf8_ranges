@@ -43,6 +43,12 @@ None.
 
 Default construction is non-throwing.
 
+### Example
+
+```cpp
+--8<-- "examples/reference/character-constants.cpp"
+```
+
 ## Checked Scalar Construction
 
 ### Synopsis
@@ -72,6 +78,12 @@ None.
 ### `noexcept`
 
 Always `noexcept`.
+
+### Example
+
+```cpp
+--8<-- "examples/reference/character-checked-construction.cpp"
+```
 
 ## Unchecked Construction
 
@@ -117,6 +129,14 @@ None.
 ### `noexcept`
 
 All listed overloads are `noexcept`.
+
+### Example
+
+Prefer the checked constructors and literals in normal user code. The unchecked overloads are for already-trusted input.
+
+```cpp
+--8<-- "examples/reference/character-unchecked-construction.cpp"
+```
 
 ## Scalar Value, Encoding, And Cross-Encoding Conversion
 
@@ -173,6 +193,12 @@ Constant.
 - `as_scalar()`, conversion operators, `code_unit_count()`, and `encode_*()` are `noexcept`.
 - `to_*_owned()` is not `noexcept`.
 
+### Example
+
+```cpp
+--8<-- "examples/reference/character-scalar-and-encoding.cpp"
+```
+
 ## Scalar Iteration Helpers
 
 ### Synopsis
@@ -209,6 +235,12 @@ None.
 ### `noexcept`
 
 All four operators are `noexcept`.
+
+### Example
+
+```cpp
+--8<-- "examples/reference/character-iteration.cpp"
+```
 
 ## Unicode Classification Predicates
 
@@ -248,6 +280,12 @@ None.
 
 All listed overloads are `noexcept`.
 
+### Example
+
+```cpp
+--8<-- "examples/reference/character-unicode-predicates.cpp"
+```
+
 ## ASCII Classification Predicates
 
 ### Synopsis
@@ -286,6 +324,12 @@ None.
 
 All listed overloads are `noexcept`.
 
+### Example
+
+```cpp
+--8<-- "examples/reference/character-ascii-predicates.cpp"
+```
+
 ## ASCII Transforms And ASCII Comparison
 
 ### Synopsis
@@ -320,6 +364,12 @@ None.
 ### `noexcept`
 
 All listed overloads are `noexcept`.
+
+### Example
+
+```cpp
+--8<-- "examples/reference/character-ascii-transforms.cpp"
+```
 
 ## Comparison, Streaming, Hashing, And Formatting
 
@@ -375,6 +425,12 @@ Constant.
 - The comparison overloads and hashers are non-throwing.
 - Stream insertion and formatters are not `noexcept`.
 
+### Example
+
+```cpp
+--8<-- "examples/reference/character-formatting.cpp"
+```
+
 ## Character Literals
 
 ### Synopsis
@@ -400,4 +456,6 @@ Because these are `consteval` literals, invalid input is rejected during compila
 
 ### Example
 
-The example at the top of this page uses both `utf8_char::from_scalar(...)` and `_u8c` in printable, emoji-heavy form.
+```cpp
+--8<-- "examples/reference/character-literals.cpp"
+```
